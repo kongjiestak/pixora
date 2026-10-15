@@ -1,15 +1,13 @@
-# 安全边界
+# Pixora security / 安全
 
-V0.1 是单用户自托管原型。持有写 token 者可以提交伪造观测；source 是来源声明，不是服务端密码学证明。读 token 泄漏会暴露额度和时间信息，泄漏后替换 .env 并重启服务，客户端同步更新。首版没有每设备撤销或多租户隔离。
+Single-user, single trust domain prototype. A stolen write token can forge observations; `source` is a trusted collector assertion, not cryptographic provenance. A read token grants all currently stored quota observations; there is no per-device scope/revocation or tenant isolation. Do not provision untrusted public displays. Shared-screen UI clears token, cancels requests and filters private widgets, but is not server ACL.
 
-Codex 认证留在 Mac，由已安装的 Codex CLI 管理。项目不读取 auth.json、不上传会话、提示词、邮箱、账号 ID、积分详情或原始 RPC。只做额度查询，不调用模型任务。查询可能由 CLI 正常刷新自身登录状态。
+Use distinct random 32+ character `PIXORA_READ_TOKEN` and `PIXORA_WRITE_TOKEN`. Bearer header only, no query tokens; no CORS by default. Tokens/observations remain in page memory, settings/locale in localStorage. PWA caches only public assets, never API. Restart after token rotation; every device sharing that token is affected. No server control API is implemented.
 
-两个独立随机 token 至少 32 字符；Authorization Bearer 传递，不放 URL。网页只在内存保存读 token，刷新后需重输。不要向网页输入写 token。默认无 CORS，禁止框架嵌入、禁止响应缓存。SQLite 只保留每模式每来源最新快照，默认共四行；不会记录用量历史。
+Codex authentication stays with the installed CLI. Pixora does not open auth.json, collect cookies/prompts or send raw RPC. The query can cause normal CLI credential refresh. `--print-only` outputs account observations: keep private. Snapshot fields/body size and time ordering are validated; no account data is distributed. Backups and credentials must be separate. The legacy `APM_*` fallback is supported; avoid conflicting variables.
 
-HTTP 仅适合本机回环；可信加密 VPN 内可显式启用 --allow-private-http，承载安全取决于 VPN 与端点。公网必须 HTTPS，不能直接暴露 8000。ESP32 未来必须校验证书、限制重定向并保护本地 token。家中 CGNAT/断电/无 VPN 网关时，跨网不可达。
+Default service binds loopback. HTTPS is required outside loopback, except an explicitly trusted encrypted private VPN with collector `--allow-private-http`. Use a reverse proxy with TLS, body/connection/rate limits, and logs that exclude Authorization. Do not expose Codex app-server. The app does not include internet-scale rate limiting, audit logging or endpoint isolation.
 
-API 有 32KiB body、32 个窗口、字符串与时间校验、旧快照拒绝和超时。它没有互联网级限流/审计；公共入口由反向代理提供限流、连接数限制与 TLS。公网日志不得记录 Authorization。不要将 Codex app-server 本身映射为公网服务。
+Vulnerability reporting: contact the owner via [GitHub profile](https://github.com/kongjiestak) first, without disclosing secrets. A dedicated confidential intake channel is not established and no SLA is promised. If no private contact is available, open a minimal issue requesting a private channel; do not include exploit credentials or sensitive data. Do not claim a security audit or production hardening from these checks.
 
-备份数据库与凭据分开；压缩包/Git 排除 .env、数据、依赖环境。端点返回的剩余额度是时点观测，不保证下一次请求一定成功。宿主时钟需同步；不同账号切换建议清空专用数据卷或启动新实例，避免混合账号。
-
-共享屏幕只做本机显示过滤并清除内存令牌，不是服务端 ACL。公共终端不要发放读取私人指标的令牌。PWA 只缓存公共静态壳及编译资源，不缓存 API，浏览器本机设备配置不含令牌。
+中文：首版单信任域，只读令牌可读全部额度，共享界面不等于服务端权限。令牌泄漏后更换并重启，所有共享该令牌的设备都受影响。公网必须配置 TLS 与代理限流；不暴露 Codex 自身端口。不上传 Cookie、凭据、原始 RPC；打印观测也需保密。漏洞先通过维护者主页联系，尚无专用私密渠道与响应承诺，公开 Issue 不贴敏感细节。

@@ -16,4 +16,14 @@ jobs:
       - run: npm --prefix web ci
       - run: npm --prefix web test
       - run: npm --prefix web run build
-      - run: docker build -t apm-ci .
+      - run: docker build -t pixora-ci .
+      - name: Container runtime smoke
+        env:
+          PIXORA_READ_TOKEN: ci-read-only-test-value-000000000000000000
+          PIXORA_WRITE_TOKEN: ci-write-only-test-value-00000000000000000
+        run: |
+          docker run -d --name pixora-smoke -p 127.0.0.1:8000:8000 -e PIXORA_READ_TOKEN -e PIXORA_WRITE_TOKEN pixora-ci
+          trap 'docker stop pixora-smoke' EXIT
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:8000/healthz
+          docker exec pixora-smoke python -m pixora.collector --plugin demo --once
+          docker exec pixora-smoke python scripts/check_service.py

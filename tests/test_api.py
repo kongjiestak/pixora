@@ -1,8 +1,8 @@
 from datetime import timedelta
 from fastapi.testclient import TestClient
 import pytest
-from apm.server import create_app
-from apm.models import now
+from pixora.server import create_app
+from pixora.models import now
 
 READ = "r"*40
 WRITE = "w"*40
@@ -88,3 +88,22 @@ def test_expired_reset_and_headers(client):
     r=client.get('/api/v1/device',headers=auth(READ))
     assert r.json()['providers'][0]['stale']
     assert r.headers['cache-control']=='no-store'
+
+
+def test_collection_alias_and_localizable_reason(client):
+    v=payload();v['collected_at']=v.pop('observed_at')
+    assert client.post('/api/v1/snapshots',json=v,headers=auth(WRITE)).status_code==200
+    p=client.get('/api/v1/device',headers=auth(READ)).json()['providers'][0]
+    assert p['collected_at']==p['observed_at']
+    absent=client.get('/api/v1/device',headers=auth(READ)).json()['providers'][1]
+    assert absent['reason_code']=='chatgpt_unavailable' and absent['reason'] is None
+
+
+def test_environment_migration(tmp_path,monkeypatch):
+    monkeypatch.setenv('APM_READ_TOKEN', READ)
+    monkeypatch.setenv('APM_WRITE_TOKEN', WRITE)
+    monkeypatch.setenv('PIXORA_READ_TOKEN','n'*40)
+    monkeypatch.setenv('PIXORA_WRITE_TOKEN','m'*40)
+    c=TestClient(create_app(tmp_path/'env.sqlite'))
+    assert c.get('/api/v1/device',headers=auth(READ)).status_code==401
+    assert c.get('/api/v1/device',headers=auth('n'*40)).status_code==200

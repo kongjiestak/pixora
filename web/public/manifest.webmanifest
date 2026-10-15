@@ -1,1 +1,24 @@
-{"id": "/", "name": "AI Pocket Monitor", "short_name": "APM", "start_url": "/?kiosk", "scope": "/", "display": "standalone", "background_color": "#0b141b", "theme_color": "#0b141b", "icons": [{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"}, {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]}
+{
+  "id": "/",
+  "name": "Pixora \u2014 Make Every Screen Useful.",
+  "short_name": "Pixora",
+  "start_url": "/?kiosk",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b141b",
+  "theme_color": "#0b141b",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

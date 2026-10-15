@@ -1,7 +1,5 @@
-# V0.1 最新需求
+# Current scope
 
-以 ARCHITECTURE.md、ROADMAP.md、CODEX_TASK.md 为权威范围。Web/PWA 与未来 ESP32 平等，首版交付手机/桌面终端；不要求购买硬件或 VPS。
+Pixora is a working brand for a self-hosted, software-first information display and interaction platform. This is Early Development. README.md/README.zh-CN.md describe implemented features; ROADMAP.md describes future modes. English and Simplified Chinese are the only translated languages.
 
-已实现最小纵向闭环、来源与过期、读写令牌、演示隔离、三种 Widget、主题/预设/本机设备设置、共享过滤和 PWA 壳。首版不含完整个人信息模块、自动化控制、多用户 ACL、拖拽编辑器、ESP32 固件。
-
-真实 Codex 来源采用官方 App Server 额度查询。ChatGPT 没有本项目可依赖的公开稳定个人额度 API，始终显示未接入，绝不伪造。
+No complete personal data suite, automation controls, server device ACL/editor, ESP32 simulator/firmware, NFC, MagSafe or custom PCB is claimed. Unknown quotas are unavailable; demos are labeled. Physical phone PWA and deployment acceptance remain required before claiming a completed V0.1.

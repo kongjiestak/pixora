@@ -3,13 +3,13 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "${APM_BIND:-127.0.0.1}:8000:8000"
+      - "${PIXORA_BIND:-127.0.0.1}:8000:8000"
     environment:
-      APM_READ_TOKEN: ${APM_READ_TOKEN:?Generate .env first}
-      APM_WRITE_TOKEN: ${APM_WRITE_TOKEN:?Generate .env first}
-      APM_STALE_SECONDS: "600"
+      PIXORA_READ_TOKEN: ${PIXORA_READ_TOKEN:?Generate .env first}
+      PIXORA_WRITE_TOKEN: ${PIXORA_WRITE_TOKEN:?Generate .env first}
+      PIXORA_STALE_SECONDS: "600"
     volumes:
-      - apm-data:/data
+      - pixora-data:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
       interval: 30s
@@ -19,4 +19,4 @@ services:
       - no-new-privileges:true
     cap_drop: [ALL]
 volumes:
-  apm-data:
+  pixora-data:

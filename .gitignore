@@ -10,3 +10,12 @@ data/
 .DS_Store
 build/
 dist/
+.env.*
+!.env.example
+*.log
+.codex/
+auth.json
+*.pem
+*.key
+coverage/
+work/

@@ -1,3 +1,5 @@
-export const remaining = value => Number.isFinite(value) ? `${Math.max(0, Math.min(100, 100-value)).toFixed(0)}%` : '未知'
-export const stamp = value => value ? new Date(value).toLocaleString() : '尚未采集'
-export const windowLabel = minutes => minutes ? minutes >= 1440 ? `${(minutes/1440).toFixed(1)} 天窗口` : `${minutes/60} 小时窗口` : '窗口长度未知'
+export const remaining = (value, locale='en-US', unknown='Unknown') => Number.isFinite(value) ? new Intl.NumberFormat(locale,{style:'percent',maximumFractionDigits:0}).format(Math.max(0,Math.min(100,100-value))/100) : unknown
+export const stamp = (value, locale='en-US', empty='Not collected') => value && Number.isFinite(new Date(value).getTime()) ? new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'medium'}).format(new Date(value)) : empty
+export const windowLabel = (minutes, t, locale='en-US') => minutes ? t(minutes >= 1440 ? 'widget.days' : 'widget.hours',{count:new Intl.NumberFormat(locale,{maximumFractionDigits:1}).format(minutes/(minutes >= 1440 ? 1440 : 60))}) : t('widget.unknownWindow')
+export const currency = (value, code, locale='en-US') => new Intl.NumberFormat(locale,{style:'currency',currency:code}).format(value)
+export const isStale = (provider, data, clock) => provider.stale || !provider.observed_at || (clock-new Date(provider.observed_at))/1000 > data.stale_after_seconds || provider.windows.some(w=>w.resets_at && new Date(w.resets_at)<=clock)

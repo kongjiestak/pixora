@@ -3,36 +3,41 @@ import json
 import sqlite3
 import secrets
 from pathlib import Path
-from contextlib import asynccontextmanager
-from datetime import timedelta
+from contextlib import asynccontextmanager, contextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
-from apm.models import Snapshot, now
+from pixora.models import Snapshot, now
+from pixora.settings import setting
 
 bearer = HTTPBearer(auto_error=False)
 
 def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=None, web_dir=None):
-    read_token = read_token or os.getenv("APM_READ_TOKEN", "")
-    write_token = write_token or os.getenv("APM_WRITE_TOKEN", "")
+    read_token = read_token or setting("READ_TOKEN", "")
+    write_token = write_token or setting("WRITE_TOKEN", "")
     if min(len(read_token), len(write_token)) < 32 or read_token == write_token:
-        raise RuntimeError("Set distinct APM_READ_TOKEN and APM_WRITE_TOKEN (32+ characters)")
-    db_path = str(db_path or os.getenv("APM_DB", "data/apm.sqlite"))
-    stale = int(stale_seconds or os.getenv("APM_STALE_SECONDS", "600"))
+        raise RuntimeError("Set distinct PIXORA_READ_TOKEN and PIXORA_WRITE_TOKEN (32+ characters)")
+    db_path = str(db_path or setting("DB", "data/pixora.sqlite"))
+    stale = int(stale_seconds or setting("STALE_SECONDS", "600"))
     if stale < 1:
-        raise RuntimeError("APM_STALE_SECONDS must be positive")
+        raise RuntimeError("PIXORA_STALE_SECONDS must be positive")
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    @contextmanager
     def db():
         conn = sqlite3.connect(db_path, timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
     with db() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS snapshots(provider TEXT, mode TEXT, body TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY(provider,mode))")
 
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="AI Pocket Monitor", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.1.0.dev1", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
@@ -87,15 +92,15 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
                 snap = Snapshot.model_validate_json(row[0])
                 item = json.loads(snap.model_dump_json())
                 age = max(0, int((now() - snap.observed_at).total_seconds()))
-                item.update(received_at=row[1], age_seconds=age, stale=age > stale or any(w.resets_at and w.resets_at <= now() for w in snap.windows))
+                item.update(collected_at=item["observed_at"], received_at=row[1], age_seconds=age, stale=age > stale or any(w.resets_at and w.resets_at <= now() for w in snap.windows))
                 for window in item["windows"]:
                     window["remaining_percent"] = max(0, min(100, 100-window["used_percent"]))
                 items.append(item)
             else:
-                items.append(dict(provider=provider, mode=mode, source="unavailable", status="unavailable", observed_at=None, received_at=None, age_seconds=None, stale=True, windows=[], reason="尚无数据；ChatGPT 真实额度未接入" if provider == "chatgpt" else "等待 Mac 采集客户端"))
+                items.append(dict(provider=provider, mode=mode, source="unavailable", status="unavailable", observed_at=None, collected_at=None, received_at=None, age_seconds=None, stale=True, windows=[], reason_code="chatgpt_unavailable" if provider == "chatgpt" else "awaiting_collector", reason=None))
         return {"schema_version": 1, "server_time": now(), "stale_after_seconds": stale, "mode": mode, "providers": items}
 
-    web = Path(web_dir or os.getenv("APM_WEB_DIR", "web/dist"))
+    web = Path(web_dir or setting("WEB_DIR", "web/dist"))
     if web.is_dir():
         app.mount("/", StaticFiles(directory=web, html=True), name="web")
     return app

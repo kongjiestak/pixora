@@ -4,7 +4,8 @@ import json
 import os
 from typing import Protocol
 from datetime import datetime, timezone, timedelta
-from apm.models import Snapshot, Window, now
+from pixora.models import Snapshot, Window, now
+from pixora.settings import setting
 
 class Collector(Protocol):
     async def collect(self) -> list[Snapshot]: ...
@@ -26,13 +27,13 @@ def normalize(result: dict) -> Snapshot:
             if not isinstance(raw, dict) or raw.get("usedPercent") is None:
                 continue
             windows.append(Window(name=f"{bucket}/{name}", used_percent=raw["usedPercent"], duration_minutes=raw.get("windowDurationMins"), resets_at=datetime.fromtimestamp(raw["resetsAt"], timezone.utc) if raw.get("resetsAt") is not None else None))
-    return Snapshot(provider="codex", source="codex-app-server", mode="real", status="ok" if windows else "unavailable", observed_at=now(), windows=windows, reason=None if windows else "接口未返回可用额度窗口")
+    return Snapshot(provider="codex", source="codex-app-server", mode="real", status="ok" if windows else "unavailable", observed_at=now(), windows=windows, reason_code=None if windows else "quota_unavailable")
 
 class CodexCollector:
     async def collect(self):
         p = None
         try:
-            p = await asyncio.create_subprocess_exec(os.getenv("APM_CODEX_BIN", "codex"), "app-server", "--stdio", stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, limit=1024*1024)
+            p = await asyncio.create_subprocess_exec(setting("CODEX_BIN", "codex"), "app-server", "--stdio", stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, limit=1024*1024)
             async def send(message):
                 p.stdin.write((json.dumps(message)+"\n").encode())
                 await p.stdin.drain()
@@ -50,12 +51,12 @@ class CodexCollector:
                     if "id" in message and "method" in message:
                         await send({"id": message["id"], "error": {"code": -32601, "message": "unsupported"}})
             async with asyncio.timeout(30):
-                await request(1, "initialize", {"clientInfo": {"name":"ai_pocket_monitor", "version":"0.1.0"}})
+                await request(1, "initialize", {"clientInfo": {"name":"pixora", "version":"0.1.0.dev1"}})
                 await send({"method":"initialized"})
                 result = await request(2, "account/rateLimits/read", {})
                 return [normalize(result)]
         except (OSError, TimeoutError, CollectionError, ValueError, KeyError, TypeError):
-            return [Snapshot(provider="codex", source="codex-app-server", mode="real", status="error", observed_at=now(), reason="Codex 读取失败：检查 CLI 版本、登录与网络；未上传底层错误或凭据")]
+            return [Snapshot(provider="codex", source="codex-app-server", mode="real", status="error", observed_at=now(), reason_code="codex_read_failed")]
         finally:
             if p and p.returncode is None:
                 p.terminate()
@@ -67,6 +68,6 @@ class CodexCollector:
 
 class DemoCollector:
     async def collect(self):
-        return [Snapshot(provider=p, mode="demo", source="demo", status="ok", observed_at=now(), windows=[Window(name="示例/5h", used_percent=v, duration_minutes=300, resets_at=now()+timedelta(hours=2))], reason="固定模拟值，不代表账号真实额度") for p,v in (("codex", 36), ("chatgpt", 62))]
+        return [Snapshot(provider=p, mode="demo", source="demo", status="ok", observed_at=now(), windows=[Window(name="demo/primary", used_percent=v, duration_minutes=300, resets_at=now()+timedelta(hours=2))], reason_code="demo_fixed") for p,v in (("codex", 36), ("chatgpt", 62))]
 
 PLUGINS: dict[str, type[Collector]] = {"codex": CodexCollector, "demo": DemoCollector}

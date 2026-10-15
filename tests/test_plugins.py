@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from apm.plugins import normalize, DemoCollector, CodexCollector
+from pixora.plugins import normalize, DemoCollector, CodexCollector
 
 def test_multi_bucket_and_nullable():
     p=normalize({'rateLimitsByLimitId':{'codex':{'primary':{'usedPercent':0,'windowDurationMins':300,'resetsAt':1700000000},'secondary':None},'other':{'primary':{'usedPercent':100}}}})
@@ -32,3 +32,10 @@ def test_stdio_handshake_and_notification(tmp_path, monkeypatch):
     monkeypatch.setenv('APM_CODEX_BIN',str(fake))
     result=asyncio.run(CodexCollector().collect())[0]
     assert result.status=='ok' and result.windows[0].used_percent==17
+
+
+def test_errors_and_demos_use_reason_codes(monkeypatch):
+    monkeypatch.setenv('PIXORA_CODEX_BIN','/does-not-exist/codex')
+    result=asyncio.run(CodexCollector().collect())[0]
+    assert result.reason_code=='codex_read_failed' and result.reason is None
+    assert all(s.reason_code=='demo_fixed' for s in asyncio.run(DemoCollector().collect()))

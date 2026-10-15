@@ -1,11 +1,17 @@
-# 贡献
+# Contributing to Pixora
 
-先完成 README 的 demo 闭环，再提交小范围改动。不要提交 .env、真实账号数据、Codex 会话或认证文件。
+[English README](README.md) · [中文说明](README.zh-CN.md)
 
-插件必须返回归一化 Snapshot，声明真实/模拟与不可用状态；不根据 token 总量猜剩余额度。补充空值、超时、协议变化测试。新增 Widget 需声明布局、数据来源和共享限制。
+Start with the local demo roundtrip, then propose a focused issue or pull request. Pixora is Early Development: discuss schema migrations or security boundaries before major changes. Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-提交前运行 pytest、前端测试与构建。涉及认证与采集边界的改动请说明安全影响。后续版本按 docs/ROADMAP.md 推进；V0.2 优先通用数据模型与系统监控。漏洞请私下联系实际仓库维护者，勿在公开 issue 张贴 token。
+1. Python 3.11+, Node 22+; install and run as in README.
+2. Run `python -m pytest -q`, `npm --prefix web test`, `npm --prefix web run build`, `git diff --check` and `python scripts/audit_release.py` after staging your changes.
+3. Explain behavior, evidence, platform tested and limitations. Remove credentials, databases, real account snapshots and private addresses from examples and screenshots.
 
-## Widget 与个人信息扩展
+Collectors must declare real/demo/unavailable, use normalized structured fields, avoid raw RPC/credentials, and test nulls, timeouts and changed protocols. Never infer remaining subscription quota from token counts. New general metrics need a versioned Observation model rather than quota field abuse.
 
-请先读 docs/ARCHITECTURE.md。Widget 注册须声明模式和敏感性，并测试共享过滤、空值、过期、断线和演示状态。新连接器只上传规范化字段，禁止提交账号快照、Cookie、访问令牌或真实私人内容。通用指标扩展采用新版本 schema，不把系统指标塞进 quota 字段。
+Widgets declare translated title keys, mode and sensitivity. Handle empty/error/stale/offline/demo; test shared filtering. UI filtering is not server authorization. Read tokens must not become control tokens.
+
+Translation contributions must follow [I18N](docs/I18N.md), matching EN/ZH keys and fallback tests. Keep README.md and README.zh-CN.md in sync. New languages and devices require actual review, not generated support claims. Hardware follows the roadmap; no dedicated PCB in this stage.
+
+中文：先跑通演示，再提交小范围改动。接口、权限或迁移先讨论，提交说明行为和真实验证，不上传真实令牌/账号/数据库。英中文键必须同步，Widget 标注隐私和演示/离线/过期。漏洞处理见 [Security](docs/SECURITY.md)。

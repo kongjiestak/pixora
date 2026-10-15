@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Pixora Early Development
+
+- Continue APM under the provisional Pixora brand; preserve historical commits/tags/releases.
+- Rename Python package/CLI/PWA; retain APM environment and CLI aliases with documented DB/volume migration.
+- Add Vue I18n English/Simplified Chinese, detection, manual persistence, fallback and Intl formatting.
+- Add structured reason codes and collected_at response/ingest alias; keep observed_at compatibility.
+- Fix data-mode request races, dynamic stale display, disabled-storage startup and SQLite connection cleanup.
+- Add bilingual project docs, conduct/templates, license inventory and repeatable publication checks.
+- No new Pixora Release: physical device and deployment acceptance remain open.
+
 ## 0.1.0 — 2026-10-15
 
 首个公开原型：Mac Codex 真实额度采集、FastAPI + SQLite、读写令牌隔离、Vue 3 响应式看板、PWA 公共壳、Kiosk、时钟/额度/同步 Widget、明暗主题、预设布局、本机设备配置和共享显示过滤。

@@ -1,0 +1,86 @@
+{
+  "app": {
+    "stage": "早期开发",
+    "tagline": "让每一块屏幕都有价值。",
+    "support": "一个平台，任何屏幕，随你所想。",
+    "principle": "你的屏幕，你的数据，由你掌控。",
+    "defaultName": "我的信息终端",
+    "footer": "AI · 系统 · 开发者 · 个人信息 · 自动化（后续规划）",
+    "privacy": "设备设置仅存当前浏览器，令牌和观测仅存内存。",
+    "install": "在 HTTPS 或 localhost 下通过浏览器菜单安装。",
+    "brand": "当前为工作品牌，商标审查尚未完成。"
+  },
+  "config": {
+    "name": "设备名称",
+    "theme": "主题",
+    "dark": "深色",
+    "light": "浅色",
+    "layout": "预设布局",
+    "overview": "总览",
+    "focus": "专注",
+    "public": "公共屏幕",
+    "shared": "共享屏幕（清除令牌、隐藏私人组件）",
+    "token": "只读令牌",
+    "tokenHint": "仅保存于当前页面内存",
+    "language": "语言",
+    "data": "数据",
+    "real": "真实观测",
+    "demo": "演示数据",
+    "connect": "连接 / 刷新",
+    "disconnect": "断开",
+    "display": "显示模式",
+    "exit": "退出显示"
+  },
+  "status": {
+    "connected": "服务已连接",
+    "offline": "离线 / 尚未连接",
+    "cached": "离线缓存",
+    "stale": "数据过期",
+    "fresh": "新鲜观测",
+    "unavailable": "不可用",
+    "sync": "最近服务同步：{time} · 每 30 秒刷新",
+    "safe": "此组件不包含账户额度或私人信息。",
+    "failure": "连接失败（{status}），缓存可能已过期。",
+    "network": "连接失败或超时，缓存可能已过期。"
+  },
+  "widget": {
+    "clock": "时间与日期",
+    "quota": "AI 额度",
+    "status": "同步状态",
+    "personal": "个人信息 · 本机时间",
+    "system": "系统 · 同步状态",
+    "empty": "连接后显示观测；缺失额度不会被推算。",
+    "remaining": "剩余",
+    "reset": "重置时间：{time}",
+    "minutes": "{count} 分钟",
+    "unknownTime": "重置时间未知",
+    "unknown": "未知",
+    "notCollected": "尚未采集",
+    "hours": "{count} 小时窗口",
+    "days": "{count} 天窗口",
+    "unknownWindow": "窗口长度未知",
+    "collected": "采集时间：{time}",
+    "source": "数据来源：{source}"
+  },
+  "data": {
+    "demo": "演示数据 · 固定模拟值，不代表真实账号额度。",
+    "quota_unavailable": "连接器没有返回可用额度窗口。",
+    "codex_read_failed": "Codex 查询失败，请检查 CLI、登录和网络。",
+    "demo_fixed": "演示数据 · 固定示例，不代表真实账号额度。",
+    "chatgpt_unavailable": "ChatGPT 个人订阅额度尚未接入。",
+    "awaiting_collector": "等待 Mac 采集客户端。",
+    "legacy": "此记录暂无可本地化的详情。",
+    "sourceDemo": "演示数据",
+    "sourceCodex": "Codex App Server",
+    "sourceUnavailable": "不可用",
+    "demoStatus": "演示数据 · {status}"
+  },
+  "provider": {
+    "codex": "Codex",
+    "chatgpt": "ChatGPT"
+  },
+  "language": {
+    "english": "English",
+    "chinese": "简体中文"
+  }
+}

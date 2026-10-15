@@ -1,12 +1,21 @@
 <script setup>
-import { remaining, stamp, windowLabel } from './format.js'
+import {useI18n} from 'vue-i18n'
+import {remaining,stamp,windowLabel,isStale} from './format.js'
+const {t,locale}=useI18n()
 defineProps(['kind','data','clock','connected'])
+const date=value=>stamp(value,locale.value,t('widget.notCollected'))
+const label=(p,data,clock,connected)=>{const state=t(!connected?'status.cached':isStale(p,data,clock)?'status.stale':p.status==='ok'?'status.fresh':'status.unavailable');return p.mode==='demo'?t('data.demoStatus',{status:state}):state}
+const source=value=>t(value==='demo'?'data.sourceDemo':value==='codex-app-server'?'data.sourceCodex':'data.sourceUnavailable')
 </script>
 <template>
-<article v-if="kind==='clock'" class="clock-widget"><p class="eyebrow">PERSONAL · 本机时间</p><h2>{{clock.toLocaleTimeString()}}</h2><p>{{clock.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'})}}</p></article>
-<article v-else-if="kind==='status'"><p class="eyebrow">SYSTEM · 同步状态</p><h2>{{connected?'服务已连接':'离线 / 尚未连接'}}</h2><p class="muted">最近服务同步 {{stamp(data?.server_time)}} · 30 秒轮询</p><p>此组件不包含账户额度或私人信息。</p></article>
+<article v-if="kind==='clock'" class="clock-widget"><p class="eyebrow">{{t('widget.personal')}}</p><h2>{{clock.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}}</h2><p>{{clock.toLocaleDateString(locale,{weekday:'long',year:'numeric',month:'long',day:'numeric'})}}</p></article>
+<article v-else-if="kind==='status'"><p class="eyebrow">{{t('widget.system')}}</p><h2>{{t(connected?'status.connected':'status.offline')}}</h2><p class="muted">{{t('status.sync',{time:date(data?.server_time)})}}</p><p>{{t('status.safe')}}</p></article>
 <template v-else-if="kind==='quota'">
-<article v-for="p in data?.providers || []" :key="p.provider"><div class="row"><h2>{{p.provider}}</h2><span class="badge">{{!connected?'离线缓存':p.stale?'数据过期':p.status==='ok'?'新鲜观测':'不可用'}}</span></div><p class="muted">{{p.source}} · {{stamp(p.observed_at)}}</p><div v-for="w in p.windows" :key="w.name" class="window"><div class="row"><span>{{w.name}} · {{windowLabel(w.duration_minutes)}}</span><strong>{{remaining(w.used_percent)}} <small>剩余</small></strong></div><progress :value="100-w.used_percent" max="100"/><p class="muted">重置 {{stamp(w.resets_at)}} · {{w.resets_at?Math.max(0,Math.ceil((new Date(w.resets_at)-clock)/60000))+' 分钟':'时间未知'}}</p></div><p class="muted">{{p.reason}}</p></article>
-<p v-if="!data" class="empty">连接后显示真实观测；无数据时不推算额度。</p>
+<article v-for="p in data?.providers || []" :key="p.provider"><div class="row"><h2>{{t('provider.'+p.provider)}}</h2><span class="badge">{{label(p,data,clock,connected)}}</span></div>
+<p class="muted">{{t('widget.source',{source:source(p.source)})}} · {{t('widget.collected',{time:date(p.collected_at||p.observed_at)})}}</p>
+
+<div v-for="w in p.windows" :key="w.name" class="window"><div class="row"><span>{{w.name}} · {{windowLabel(w.duration_minutes,t,locale)}}</span><strong>{{remaining(w.used_percent,locale,t('widget.unknown'))}} <small>{{t('widget.remaining')}}</small></strong></div><progress :value="100-w.used_percent" max="100" :aria-label="t('widget.remaining')"/><p class="muted">{{t('widget.reset',{time:date(w.resets_at)})}} · {{w.resets_at?t('widget.minutes',{count:new Intl.NumberFormat(locale).format(Math.max(0,Math.ceil((new Date(w.resets_at)-clock)/60000)))}):t('widget.unknownTime')}}</p></div>
+<p v-if="(p.reason_code||p.reason) && p.mode!=='demo'" class="muted">{{t('data.'+(p.reason_code||'legacy'))}}</p></article>
+<p v-if="!data" class="empty">{{t('widget.empty')}}</p>
 </template>
 </template>

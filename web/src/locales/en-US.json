@@ -1,0 +1,86 @@
+{
+  "app": {
+    "stage": "EARLY DEVELOPMENT",
+    "tagline": "Make Every Screen Useful.",
+    "support": "One Platform. Any Screen. Your Way.",
+    "principle": "Your Screen. Your Data. Your Control.",
+    "defaultName": "My information screen",
+    "footer": "AI · Systems · Developer · Personal · Automation (roadmap)",
+    "privacy": "Settings stay on this browser. Tokens and observations are kept in memory only.",
+    "install": "Install from your browser menu on HTTPS or localhost.",
+    "brand": "Working brand; trademark clearance pending."
+  },
+  "config": {
+    "name": "Device name",
+    "theme": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "layout": "Layout",
+    "overview": "Overview",
+    "focus": "Focus",
+    "public": "Public screen",
+    "shared": "Shared screen (clear token and hide private widgets)",
+    "token": "Read-only token",
+    "tokenHint": "Kept in this page memory only",
+    "language": "Language",
+    "data": "Data",
+    "real": "Real observations",
+    "demo": "Demo data",
+    "connect": "Connect / Refresh",
+    "disconnect": "Disconnect",
+    "display": "Display mode",
+    "exit": "Exit display"
+  },
+  "status": {
+    "connected": "Service connected",
+    "offline": "Offline / Not connected",
+    "cached": "Offline cache",
+    "stale": "Stale data",
+    "fresh": "Fresh observation",
+    "unavailable": "Unavailable",
+    "sync": "Last service sync: {time} · Polls every 30 seconds",
+    "safe": "This widget contains no account quota or private content.",
+    "failure": "Connection failed ({status}). Cached observations may be stale.",
+    "network": "Connection failed or timed out. Cached observations may be stale."
+  },
+  "widget": {
+    "clock": "Time and date",
+    "quota": "AI quota",
+    "status": "Sync status",
+    "personal": "PERSONAL · Local time",
+    "system": "SYSTEM · Sync status",
+    "empty": "Connect to view observations. Missing quota is never estimated.",
+    "remaining": "remaining",
+    "reset": "Resets {time}",
+    "minutes": "{count} min",
+    "unknownTime": "Reset time unknown",
+    "unknown": "Unknown",
+    "notCollected": "Not collected",
+    "hours": "{count} hour window",
+    "days": "{count} day window",
+    "unknownWindow": "Window duration unknown",
+    "collected": "Collected: {time}",
+    "source": "Source: {source}"
+  },
+  "data": {
+    "demo": "Demo Data · Fixed examples, not real account quotas.",
+    "quota_unavailable": "The connector returned no usable quota windows.",
+    "codex_read_failed": "Codex query failed. Check CLI, sign-in and network.",
+    "demo_fixed": "Demo Data · Fixed example, not a real account quota.",
+    "chatgpt_unavailable": "ChatGPT personal subscription quota is not connected.",
+    "awaiting_collector": "Waiting for the Mac collector.",
+    "legacy": "No localized detail is available for this record.",
+    "sourceDemo": "Demo Data",
+    "sourceCodex": "Codex App Server",
+    "sourceUnavailable": "Unavailable",
+    "demoStatus": "Demo Data · {status}"
+  },
+  "provider": {
+    "codex": "Codex",
+    "chatgpt": "ChatGPT"
+  },
+  "language": {
+    "english": "English",
+    "chinese": "简体中文"
+  }
+}

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from typing import Literal
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator, AliasChoices
 
 def now():
     return datetime.now(timezone.utc)
@@ -25,8 +25,9 @@ class Snapshot(BaseModel):
     source: Literal["codex-app-server", "unavailable", "demo"]
     mode: Literal["real", "demo"]
     status: Literal["ok", "unavailable", "error"]
-    observed_at: datetime
+    observed_at: datetime = Field(validation_alias=AliasChoices("observed_at", "collected_at"))
     windows: list[Window] = Field(default_factory=list, max_length=32)
+    reason_code: Literal["quota_unavailable", "codex_read_failed", "demo_fixed", "chatgpt_unavailable", "awaiting_collector"] | None = None
     reason: str | None = Field(default=None, max_length=300)
 
     @model_validator(mode="after")

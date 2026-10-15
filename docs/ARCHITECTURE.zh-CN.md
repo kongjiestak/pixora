@@ -1,0 +1,17 @@
+# Pixora 架构
+
+[English](ARCHITECTURE.md) | [简体中文](ARCHITECTURE.zh-CN.md)
+
+单体仓库、软件优先。Mac 可信连接器 → 写令牌 / FastAPI → SQLite WAL → 只读设备 API → Vue 3 + Vue I18n → Widget / 浏览器与手机 PWA。未来 ESP32 使用同一版本化读接口，五大模式是扩展分类而非五套已完成应用。
+
+连接器实现 `Collector.collect() -> list[Snapshot]`，目前仅允许注册 Codex 和 demo，不加载任意外部代码。v1 数据模型包含 provider/source/mode/status/observed_at/windows/reason_code；采集时间可用 collected_at 写入，读取同时返回两种名称，附接收时间、年龄、过期。当前明确限定额度来源，不把系统指标塞进额度字段。
+
+Widget 注册字段为 titleKey/mode/sensitivity，组件输入 data/clock/connected，展示与语言解耦。UTC 存储、Intl 按区域和本机时区格式化。时钟、额度、同步状态和三套布局已实现；名称/主题/布局/共享配置只存当前浏览器。共享清除令牌与未完成请求，不是服务端 ACL。
+
+SQLite 仅保存每个来源与模式的最新观测，不提供历史曲线；事务拒绝旧观测覆盖新值，操作后关闭连接。令牌区分读写，但仍是单用户、单信任域。
+
+PWA 只缓存公共壳与资源，不缓存 API、令牌或观测，重开需重新连接。HTTPS/localhost 才支持完整能力，全屏与常亮视浏览器支持。无已完成的拖拽编辑器、服务端设备注册或 ESP32 模拟器。
+
+下一步 Observation v2 规划 connector_id、mode、metric、value、unit、采集/失效时间、provenance 和 sensitivity，需数据库迁移及旧读接口兼容。五大模式可混合布局；PVE/NAS、CI、日历/待办/天气、个人摘要、Home Assistant 尚待实现。控制需独立授权、审计与幂等命令通道。
+
+不可信公共屏幕接入前必须有服务端逐设备令牌撤销、字段权限与数据裁剪。Mac 可独立运行；PVE Linux VM 可常驻服务，Mac 休眠则采集过期，VPS 可选。多尺寸 ESP32、NFC、MagSafe、自研 PCB 后续探索。

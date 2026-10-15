@@ -1,23 +1,28 @@
-# V0.1 验证报告 · 2026-10-15
+# Pixora verification — 2026-10-15
 
-本次在 MacBook Air M2 本机执行，不含远程部署或真机安装声明。
+Current state: **Early Development**, not accepted V0.1. Tests below were actually executed; generated support matrices are not evidence.
 
-| 项目 | 结果 |
+| Check | Observed result |
 |---|---|
-| Codex 真实查询 | PASS：本机 codex app-server 初始化及 account/rateLimits/read，返回 2 个真实窗口；不在开源包包含账号值 |
-| Mac 真实客户端 | PASS：--plugin codex --once 推送本机 8017 服务 |
-| 真实 HTTP 闭环 | PASS：规范化快照→POST→SQLite→只读 GET，Codex ok，ChatGPT unavailable |
-| 演示客户端闭环 | PASS：demo --once，两个来源均显式 demo |
-| Python | 16 passed；1 个 Starlette TestClient/httpx 弃用警告，无失败 |
-| 前端 | 4 passed；Vue/Vite 生产构建成功（最终 JS 约 76 KB / gzip 30 KB） |
-| 静态资源 | 首页、manifest、worker、192/512 图标 HTTP 200；worker 语法检查成功 |
-| 权限 | 无 token 返回 401；读写隔离、空值、过期、持久化、回放/未来值、超限测试通过 |
-| 浏览器 | 内置浏览器实际连接演示、共享开关隐藏额度并清除输入、375×812 竖屏和 812×375 横屏检查、Kiosk 进入成功；修正横屏时钟换行 |
-| Compose | docker compose config --quiet 通过 |
-| Docker 构建/容器运行 | 未完成：本机 Docker daemon 未启动；未实际运行容器，CI 保留 docker build 检查 |
-| Android / iPhone / iPad PWA | manifest/图标/worker 已实现；尚未真机验收安装、长期常亮和旧系统兼容 |
-| PVE / 日本 VPS | 未部署，无需购买 VPS；提供自托管配置和部署指南 |
+| Python install after package rename | Passed, `pixora-dashboard` 0.1.0.dev1 / namespace pixora |
+| Backend tests | 19 passed on local Python 3.13, pytest 9.1.1; one upstream Starlette TestClient/httpx deprecation warning |
+| Frontend tests | 9 passed, including actual Vue I18n switching/fallback, key parity, locale choice, disabled/corrupt storage, formatting, clock-based staleness and shared filtering |
+| Production build | Passed on Node 24 (supported floor 22+); JS about 141 KB / gzip 52 KB |
+| Real Codex query | Passed again: 2 windows, current CLI account/rateLimits/read; account values not published |
+| Real data roundtrip | Passed: connector → authenticated local HTTP POST → SQLite → read-only API; ChatGPT stays unavailable |
+| Demo / static smoke | Passed: collector demo upload, read/write boundaries, demo/real isolation, collection timestamp and PWA assets |
+| Browser language/display | Passed in desktop in-app Chromium: EN/ZH switching, preference after reload, shared clears/hides private data, Kiosk entry and exit controls |
+| Responsive | 375×812 and 812×375 browser viewports checked; no horizontal document overflow. These are viewport tests, not real-phone certification |
+| Offline shell | Passed: temporarily offline network + reload still renders public UI; network restored. No API observation cache claimed |
+| npm audit | 0 known vulnerabilities after installing locked dependencies |
+| Python advisories | pip-audit pinned requirements: 0 known vulnerabilities after fixing pytest advisory |
+| License inventory | Actual Python/npm metadata inspected; npm runtime notices retained; devtools license obtained from matching upstream tag |
+| Secret/history scan | Basic staged and reachable-history scan passed; no tested sensitive patterns. Not a professional audit |
+| Docker local | CLI exists; daemon unavailable. Compose is checked with generated random test tokens. Local container build/runtime cannot be claimed |
+| New CI | Pipeline includes Python/Node clean install/tests/build, Docker build and container startup/demo/API smoke. Consult actual [Actions](https://github.com/kongjiestak/pixora/actions) result for the published commit |
+| PVE / optional VPS | Not deployed or verified |
+| Physical Android / iPhone / iPad | Installation, old-system compatibility, long-running wake/background/restore not verified |
 
-真实采集依据：[官方 Codex App Server](https://learn.chatgpt.com/docs/app-server)。额度是 Codex 的账户限额快照，不代表 ChatGPT 全模型个人额度。ChatGPT 真实来源始终不可用。
+Clean exported source verification passed independently: new venv, pinned dependency install, non-editable project installation, generated .env (0600), 19 backend tests, 9 frontend tests, production build, Compose config and a running server → CLI demo → SQLite/API smoke. Dependencies are pinned but do not yet include wheel hashes or a signed SBOM. Codex upstream behavior and working-brand legal clearance remain outside the guarantees of this build.
 
-共享模式为本机显示过滤，首版只有单信任域共享只读令牌，没有服务端逐设备 ACL。PWA 离线只缓存公共壳，不缓存 API 与 token，重启需重新输入 token。
+Historical author/committer metadata contains a personal email; this is a separate publication blocker requiring owner disposition. No email value is repeated in the report. Content secret scanning alone does not resolve it.
