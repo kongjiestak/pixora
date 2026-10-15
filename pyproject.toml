@@ -9,6 +9,7 @@ dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "httpx>=0.27,<1"]
 [project.optional-dependencies]
 test = ["pytest>=9.0.3,<10"]
 [project.scripts]
+pixora-device = "pixora.devices:main"
 pixora-collect = "pixora.collector:main"
 apm-collect = "pixora.collector:main"
 [tool.setuptools.packages.find]

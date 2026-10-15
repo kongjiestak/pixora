@@ -16,3 +16,7 @@ Acceptance-driven, no promised dates. Current status: **Early Development**, pac
 | V1.0 | Stable SDK/protocol, migrations, permission model, reproducible releases | Planned; platform matrix, recovery drills and security review |
 
 NFC, MagSafe and custom PCB are separate future experiments. The legacy APM `v0.1.0` pre-release is retained as history and is not evidence of Pixora acceptance.
+
+## 2026-10-15 progress / 进度更新
+
+Provider/mode scoped device tokens, digest-only storage, expiry and live revocation are implemented ahead of the V0.4 milestone. Local CLI administration only; pairing UI, field-level policies and server layout synchronization remain planned. Linux Docker runtime CI passed for the previous baseline; this increment is subject to its own CI. Physical-phone/PVE acceptance remains open.

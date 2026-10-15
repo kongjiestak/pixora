@@ -28,7 +28,7 @@ Actual running build, **Demo Data only** (not account quotas):
 | Browser device settings | Local only; name, theme, layout, sharing; no server device-management UI |
 | Responsive display / Kiosk | Implemented; browser viewport checks; full-screen and wake lock are best effort |
 | PWA | Manifest, icons and offline public shell; physical phone installation still unverified |
-| Shared display privacy | Local filter clears token/private data; **not** a server per-device ACL |
+| Shared display privacy | Local filter plus opt-in server provider/mode scoped tokens; [device guide](docs/DEVICES.md) |
 | Docker Compose | Provided; current validation is recorded in [verification](docs/VERIFICATION.md) |
 | System / developer / personal integrations / controls / ESP32 | Roadmap, except local clock and sync status; no hardware firmware or simulator in this revision |
 
@@ -85,7 +85,7 @@ Phones need a deliberately configured LAN/private-network address. Full PWA supp
 - Bearer headers, distinct 32+ character tokens, no token in URLs; local clock, receipt time, collection time, reset time and stale states are distinguished.
 - `collected_at` is returned alongside legacy `observed_at`; ingest accepts either. Structured `reason_code` enables translation. Unknown values never mean zero remaining.
 - Credentials remain with Codex on the collector Mac. No cookies, raw RPC, prompts, private account details or personal databases are shipped. API responses are never cached by the service worker.
-- One read token sees all quota data in this single trust domain. Shared-screen mode is a UI filter; do not give the token to an untrusted public screen. Rotate tokens and restart to revoke. No control commands are implemented.
+- Independent display tokens now enforce provider/mode scope, expiry and live revocation on the server. Provision with the local CLI; [device guide](docs/DEVICES.md). The legacy global read token still sees all data until explicitly disabled. Shared-screen UI filtering alone is not access control. No control commands are implemented.
 - Pixora is a provisional working name with existing unrelated uses. No trademark ownership or affiliation with OpenAI, GitHub, Espressif or Home Assistant is claimed.
 
 ## Development

@@ -16,3 +16,7 @@
 | V1.0 | 稳定 SDK/协议、迁移、权限、可复现发布 | 规划；真机矩阵、恢复演练、安全检查 |
 
 NFC、MagSafe、自研 PCB 为独立后续探索。保留旧 APM v0.1.0 预发布用于历史追溯，不作为 Pixora 验收证据。
+
+## 2026-10-15 progress / 进度更新
+
+Provider/mode scoped device tokens, digest-only storage, expiry and live revocation are implemented ahead of the V0.4 milestone. Local CLI administration only; pairing UI, field-level policies and server layout synchronization remain planned. Linux Docker runtime CI passed for the previous baseline; this increment is subject to its own CI. Physical-phone/PVE acceptance remains open.

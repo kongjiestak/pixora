@@ -17,3 +17,9 @@
 已验证：16 项 Python 测试、4 项前端测试、生产构建及真实 HTTP 采集闭环。
 
 限制：ChatGPT 真实额度未接入；Docker 运行、PVE 与手机真机安装尚待验收；单用户单信任域，无逐设备服务端 ACL；完整个人信息、自动化和硬件固件尚未实现。
+
+## Unreleased — scoped displays
+
+- Local device administration with independent hashed read tokens, provider/mode scopes, expiry and immediate revocation.
+- Optional legacy global-read disable switch and bilingual migration instructions.
+- No device management UI, field-level or multi-tenant isolation claimed.

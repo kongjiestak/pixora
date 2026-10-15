@@ -7,6 +7,7 @@ services:
     environment:
       PIXORA_READ_TOKEN: ${PIXORA_READ_TOKEN:?Generate .env first}
       PIXORA_WRITE_TOKEN: ${PIXORA_WRITE_TOKEN:?Generate .env first}
+      PIXORA_ALLOW_LEGACY_READ_TOKEN: ${PIXORA_ALLOW_LEGACY_READ_TOKEN:-true}
       PIXORA_STALE_SECONDS: "600"
     volumes:
       - pixora-data:/data

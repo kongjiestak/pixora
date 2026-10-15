@@ -9,6 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from pixora.models import Snapshot, now
 from pixora.settings import setting
+from pixora.devices import initialize, token_hash
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -32,6 +33,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         finally:
             conn.close()
     with db() as conn:
+        initialize(conn)
         conn.execute("CREATE TABLE IF NOT EXISTS snapshots(provider TEXT, mode TEXT, body TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY(provider,mode))")
 
     @asynccontextmanager
@@ -63,6 +65,21 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
                 raise HTTPException(401, "invalid token", headers={"WWW-Authenticate":"Bearer"})
         return check
 
+    def read_scope(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
+        if credentials is None:
+            raise HTTPException(401, "invalid token", headers={"WWW-Authenticate": "Bearer"})
+        token = credentials.credentials
+        if secrets.compare_digest(token, read_token):
+            if setting("ALLOW_LEGACY_READ_TOKEN", "true").lower() != "true":
+                raise HTTPException(401, "invalid token")
+            return {"providers": ["codex", "chatgpt"], "modes": ["real", "demo"], "id": None}
+        with db() as conn:
+            row = conn.execute("SELECT id,providers,modes,expires_at FROM devices WHERE token_hash=? AND revoked=0 AND expires_at>?",
+                               (token_hash(token), now().isoformat())).fetchone()
+        if row is None:
+            raise HTTPException(401, "invalid token", headers={"WWW-Authenticate": "Bearer"})
+        return {"id": row[0], "providers": json.loads(row[1]), "modes": json.loads(row[2])}
+
     @app.get("/healthz")
     def health():
         return {"status": "ok"}
@@ -79,14 +96,16 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
             conn.execute("INSERT OR REPLACE INTO snapshots VALUES (?,?,?,?)", (snapshot.provider, snapshot.mode, body, received))
         return {"accepted": True, "received_at": received}
 
-    @app.get("/api/v1/device", dependencies=[Depends(auth(read_token))])
-    def device(mode: str = "real"):
+    @app.get("/api/v1/device")
+    def device(mode: str = "real", scope=Depends(read_scope)):
         if mode not in ("real", "demo"):
             raise HTTPException(422, "mode must be real or demo")
+        if mode not in scope["modes"]:
+            raise HTTPException(403, "device mode not permitted")
         with db() as conn:
             rows = dict((p, (body, received)) for p, body, received in conn.execute("SELECT provider, body, received_at FROM snapshots WHERE mode=?", (mode,)))
         items = []
-        for provider in ("codex", "chatgpt"):
+        for provider in scope["providers"]:
             row = rows.get(provider)
             if row:
                 snap = Snapshot.model_validate_json(row[0])
@@ -98,7 +117,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
                 items.append(item)
             else:
                 items.append(dict(provider=provider, mode=mode, source="unavailable", status="unavailable", observed_at=None, collected_at=None, received_at=None, age_seconds=None, stale=True, windows=[], reason_code="chatgpt_unavailable" if provider == "chatgpt" else "awaiting_collector", reason=None))
-        return {"schema_version": 1, "server_time": now(), "stale_after_seconds": stale, "mode": mode, "providers": items}
+        return {"schema_version": 1, "server_time": now(), "stale_after_seconds": stale, "mode": mode, "device_id": scope["id"], "providers": items}
 
     web = Path(web_dir or setting("WEB_DIR", "web/dist"))
     if web.is_dir():
