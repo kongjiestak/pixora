@@ -1,5 +1,7 @@
 # Pixora
 
+[![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
+
 **Make Every Screen Useful. / 让每一块屏幕都有价值。**
 [English](README.md) | [简体中文](README.zh-CN.md)
 

@@ -5,7 +5,7 @@ Current state: **Early Development**, not accepted V0.1. Tests below were actual
 | Check | Observed result |
 |---|---|
 | Python install after package rename | Passed, `pixora-dashboard` 0.1.0.dev1 / namespace pixora |
-| Backend tests | 19 passed on local Python 3.13, pytest 9.1.1; one upstream Starlette TestClient/httpx deprecation warning |
+| Backend tests | 21 passed on local Python 3.13, pytest 9.1.1; one upstream Starlette TestClient/httpx deprecation warning; includes 2 commit-email regression cases |
 | Frontend tests | 9 passed, including actual Vue I18n switching/fallback, key parity, locale choice, disabled/corrupt storage, formatting, clock-based staleness and shared filtering |
 | Production build | Passed on Node 24 (supported floor 22+); JS about 141 KB / gzip 52 KB |
 | Real Codex query | Passed again: 2 windows, current CLI account/rateLimits/read; account values not published |
