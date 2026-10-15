@@ -28,3 +28,7 @@ Clean exported source verification passed independently: new venv, pinned depend
 Privacy cleanup: original author/committer personal email was replaced in the publicly referenced branch/tag history with owner authorization. A fresh remote mirror downloaded 65 objects and none contained the original email. Legacy Release/assets were retained. Old GitHub objects may remain accessible by SHA until separately handled; no complete cache erasure is claimed. The original backup is private and not distributed.
 
 The first container runtime attempt hit a connection reset during immediate startup health probing (after successful tests/build). The CI probe now retries transient startup errors with a 30-second bound and emits container diagnostics on failure; see the actual published run result.
+
+## Actual PVE target, 2026-10-15
+
+See [PVE_ACCEPTANCE.md](PVE_ACCEPTANCE.md) for actual deployment, real Mac roundtrip, container restart persistence and isolated backup/restore results on image commit `993ac50`. This supersedes the earlier PVE-not-deployed row, but physical-phone, secure phone ingress and Mac autostart/sleep gates remain open. The scoped-token increment passed 30 backend + 9 frontend tests and actual Docker CI runtime checks in [run 38753174124](https://github.com/kongjiestak/pixora/actions/runs/38753174124).

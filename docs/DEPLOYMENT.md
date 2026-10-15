@@ -6,7 +6,7 @@ Follow README on Python 3.11+ and Node 22+. `scripts/setup_env.py` creates rando
 
 For Docker: run `python3 scripts/setup_env.py`, `docker compose config --quiet`, `docker compose up -d --build`. Default host bind is `127.0.0.1`, service port 8000, non-root runtime, named volume `pixora-data`, health check `/healthz`. `docker compose down` keeps the volume; `down -v` removes it. Container runtime and deployment acceptance are documented in VERIFICATION.md.
 
-On PVE prefer a Debian/Ubuntu VM running Docker, not the hypervisor management host. The Mac collector pushes outbound over HTTPS or an explicitly trusted encrypted VPN. A sleeping Mac stops collection; snapshots become stale. Home uptime, VPN, CGNAT and firewall determine reachability. No PVE/VPS has been deployed by this repository. Japan VPS optional, not required.
+On PVE prefer a Debian/Ubuntu VM running Docker, not the hypervisor management host. The Mac collector pushes outbound over HTTPS or an explicitly trusted encrypted VPN. A sleeping Mac stops collection; snapshots become stale. Home uptime, VPN, CGNAT and firewall determine reachability. An actual PVE-hosted Debian Docker deployment has now passed the bounded checks in [PVE_ACCEPTANCE.md](PVE_ACCEPTANCE.md); no VPS is required or verified. Japan VPS optional, not required.
 
 For a private LAN/VPN choose `PIXORA_BIND` deliberately and restrict access. PWA installation requires secure context (HTTPS or localhost); phone LAN HTTP does not provide full PWA behavior. Do not disable certificate checks or put tokens in URLs. A trusted TLS reverse proxy may expose the web app; this does not expose the local Codex process. Add proxy limits and exclude Authorization from logs.
 
@@ -22,4 +22,4 @@ Browser settings migrate from `apm-device` when `pixora-device` is absent; token
 
 ## Backups and revocation
 
-Use SQLite online backup or stop before copying the database; do not ignore WAL. Back up tokens separately. One service corresponds to one Codex account: account switching should use a new DB/instance to avoid mixed observations. Rotate the relevant token and restart, then update trusted clients. Per-device ACL and revocation are future work.
+Use SQLite online backup or stop before copying the database; do not ignore WAL. Back up tokens separately. One service corresponds to one Codex account: account switching should use a new DB/instance to avoid mixed observations. Legacy global token rotation requires restart. Scoped-device tokens support immediate revocation and provider/mode restrictions; see [DEVICES.md](DEVICES.md). Backups include device token digests and scope policies; treat them as private.
