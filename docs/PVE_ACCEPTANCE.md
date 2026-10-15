@@ -22,3 +22,7 @@ Remaining gates: physical Android/iPhone/iPad installation, trusted LAN HTTPS fo
 尚未完成：真实旧手机、手机可信HTTPS入口、长时间睡眠恢复、Mac登录自启动及VM/宿主整体重启验收。仅重启Pixora容器；未改PVE启动与网络配置。备份本次为手动执行，未宣称自动备份计划。原历史旧SHA缓存问题仍独立未解决。
 
 Operational private addresses, credentials, VM SSH keys and database backups belong outside the source checkout. Use `DEVICES.md` to provision/revoke screens. A copied online-backup file may retain WAL journal mode; for a read-only immutable backup mount, use SQLite URI `mode=ro&immutable=1` or copy it into a writable scratch directory before opening. Never use `immutable=1` against a live changing database.
+
+## HTTPS follow-up — 2026-10-16
+
+A publicly trusted domain certificate was issued via manual DNS-01; LAN-bound HTTPS proxy, TLS 1.3, default trust/hostname validation, authenticated real Codex quota read, forbidden-mode 403, public PWA assets and browser secure-context/active service-worker checks passed. One exact VPN hostname mapping and DIRECT rule resolved fake-IP routing without disabling VPN. No long-lived DNS API credential was created. See HTTPS.md for manual renewal limits. The earlier trusted-LAN-HTTPS gate is now passed for the tested Mac browser; physical phone installation is still open.

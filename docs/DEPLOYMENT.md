@@ -23,3 +23,7 @@ Browser settings migrate from `apm-device` when `pixora-device` is absent; token
 ## Backups and revocation
 
 Use SQLite online backup or stop before copying the database; do not ignore WAL. Back up tokens separately. One service corresponds to one Codex account: account switching should use a new DB/instance to avoid mixed observations. Legacy global token rotation requires restart. Scoped-device tokens support immediate revocation and provider/mode restrictions; see [DEVICES.md](DEVICES.md). Backups include device token digests and scope policies; treat them as private.
+
+## Trusted LAN HTTPS
+
+See [HTTPS.md](HTTPS.md) for DNS-01, reverse-proxy, VPN hostname exceptions, scoped-token acceptance and explicit renewal requirements. Actual target TLS 1.3 and browser secure-context/service-worker checks passed on 2026-10-16; physical phones remain unverified.
