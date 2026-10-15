@@ -2,7 +2,7 @@
 
 ## Before changes
 
-Existing repo: `kongjiestak/ai-pocket-monitor`, main at `ee6b8497d6c6c4e25913b3f40a50f87eb4c186c4`; two commits, legacy APM v0.1.0 pre-release. Clean local worktree. Existing FastAPI/SQLite/Vue/PWA quota loop worked. UI strings were mostly hardcoded Chinese; generic metrics, server device ACL, complete personal information/control and ESP32 were absent. The old broad “V0.1” label did not establish full device acceptance.
+Existing repo: `kongjiestak/ai-pocket-monitor`, two historical commits, legacy APM v0.1.0 pre-release. Clean local worktree. Existing FastAPI/SQLite/Vue/PWA quota loop worked. UI strings were mostly hardcoded Chinese; generic metrics, server device ACL, complete personal information/control and ESP32 were absent. The old broad “V0.1” label did not establish full device acceptance.
 
 ## Implemented changes
 
@@ -29,4 +29,4 @@ See VERIFICATION.md for executed tests, deployment limits and open acceptance ga
 
 ## Metadata finding
 
-The final review found non-noreply personal email metadata in existing public author/committer records. The earlier blob-only scan did not cover this. Keeping the historical commits without a force rewrite also keeps these metadata. New public code publication is paused for explicit owner disposition of this conflict; no email value is repeated here. The basic scanner now prints a separate metadata-review warning.
+The final review found non-noreply personal email metadata in existing public author/committer records. The earlier blob-only scan did not cover this. Keeping the historical commits without a force rewrite also keeps these metadata. The owner selected privacy-first cleanup and authorized execution. The remote main and legacy tag were atomically replaced with sanitized history using exact leases, preserving file trees, messages and timestamps. A fresh remote mirror scan found no original personal email in downloaded objects. The legacy Release and attachments were retained. Old objects may still be available by SHA through GitHub caches; this is not a guarantee of complete erasure. No email value or private original-history backup is published here. The scanner now blocks unreviewed non-noreply commit metadata.

@@ -26,6 +26,6 @@ def main():
     if failures:raise SystemExit('Publication scan failed (values suppressed): '+', '.join(failures))
     emails=set(git('log','--all','--format=%ae%n%ce').decode().splitlines())
     personal=[e for e in emails if e and not (e.endswith('@users.noreply.github.com') or e=='noreply@github.com')]
-    if personal:print('REVIEW: historical commit metadata includes non-noreply email(s); obtain owner approval or stop publication. Values suppressed.')
-    print(f'PASS: {count} staged files, {history} historical blobs; no tested content secret patterns. Metadata review is separate.')
+    if personal:raise SystemExit('Publication blocked: non-noreply commit email metadata requires owner review. Values suppressed.')
+    print(f'PASS: {count} staged files, {history} historical blobs; no tested content secret patterns. Commit email metadata also passed.')
 if __name__=='__main__':main()
