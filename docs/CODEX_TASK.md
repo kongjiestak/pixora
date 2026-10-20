@@ -16,3 +16,5 @@ Publication policy: preserve commits and historical tags/releases, no force push
 
 
 V0.2 implementation and acceptance contract: [V0.2.md](V0.2.md). Latest status: numeric observation/history, reversible migration, Linux system connector and private system Widget implemented; deployment and device verification tracked explicitly. Existing device-scoped ACL/revocation, VPS/home deployments and iPhone installation have since passed their recorded checks; earlier table entries are historical baseline.
+
+V0.3 adds optional bounded plain-text entries to Observation v2, independent github/rss/tasks scopes, and read-only configured collectors. SQLite remains v2; old device grants do not expand. See [V0.3 implementation, limits and acceptance](V0.3.md). Calendar/weather/editor remain future tasks.

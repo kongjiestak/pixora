@@ -34,7 +34,8 @@ Actual running build, **Demo Data only** (not account quotas):
 | Shared display privacy | Local filter plus opt-in server provider/mode scoped tokens; [device guide](docs/DEVICES.md) |
 | Docker Compose | Provided; current validation is recorded in [verification](docs/VERIFICATION.md) |
 | Linux system monitoring | Real host CPU/memory/root-disk, private widget and bounded history; [V0.2](docs/V0.2.md) |
-| Developer / personal integrations / controls / ESP32 | Roadmap, except local clock; no hardware firmware or simulator in this revision |
+| Developer / personal information | Public GitHub Actions/repository, RSS/Atom and read-only local JSON tasks; [V0.3](docs/V0.3.md). Calendar/weather/task editor remain planned |
+| Controls / ESP32 | Roadmap; no hardware firmware or simulator in this revision |
 
 ## Run on your Mac or Linux computer
 

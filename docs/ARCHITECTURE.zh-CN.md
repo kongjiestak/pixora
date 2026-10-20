@@ -15,3 +15,5 @@ PWA 只缓存公共壳与资源，不缓存 API、令牌或观测，HTTPS 独立
 已实现数值型 Observation v2，包含 connector/entity ID、category、mode、metrics/value/unit、采集/失效时间、source 和 sensitivity，提供迁移和旧读接口兼容；见 [V0.2](V0.2.md)。五大模式可混合布局；PVE/NAS、CI、日历/待办/天气、个人摘要、Home Assistant 尚待实现。控制需独立授权、审计与幂等命令通道。
 
 服务端逐设备来源/模式权限、期限和撤销已实现；字段权限与公共数据裁剪仍待实现。Mac 可独立运行；PVE Linux VM 可常驻服务，Mac 休眠则采集过期，VPS 可选。多尺寸 ESP32、NFC、MagSafe、自研 PCB 后续探索。
+
+V0.3 adds optional bounded plain-text entries to Observation v2, independent github/rss/tasks scopes, and read-only configured collectors. SQLite remains v2; old device grants do not expand. See [V0.3 implementation, limits and acceptance](V0.3.md). Calendar/weather/editor remain future tasks.

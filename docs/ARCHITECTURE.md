@@ -33,3 +33,5 @@ AI / system / developer / personal / automation widgets may share one layout. PV
 Per-device provider/mode scopes, expiry and immediate revocation are implemented; field-level ACL/public projections remain planned. Local UI filtering is not this protection.
 
 Run on a Mac alone, or keep the service in a PVE Linux VM while the Mac pushes outbound observations. Mac sleep makes data stale. A VPS is optional. ESP32 sizes, NFC, MagSafe and PCB work are future hardware exploration, not current compatibility claims.
+
+V0.3 adds optional bounded plain-text entries to Observation v2, independent github/rss/tasks scopes, and read-only configured collectors. SQLite remains v2; old device grants do not expand. See [V0.3 implementation, limits and acceptance](V0.3.md). Calendar/weather/editor remain future tasks.
