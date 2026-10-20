@@ -32,3 +32,11 @@ The first container runtime attempt hit a connection reset during immediate star
 ## Actual PVE target, 2026-10-15
 
 See [PVE_ACCEPTANCE.md](PVE_ACCEPTANCE.md) for actual deployment, real Mac roundtrip, container restart persistence and isolated backup/restore results on image commit `993ac50`. This supersedes the earlier PVE-not-deployed row, but physical-phone, secure phone ingress and Mac autostart/sleep gates remain open. The scoped-token increment passed 30 backend + 9 frontend tests and actual Docker CI runtime checks in [run 38753174124](https://github.com/kongjiestak/pixora/actions/runs/38753174124).
+
+## V0.2 development increment, 2026-10-20
+
+Code commit `21832ca`: 53 Python tests, 13 frontend tests and production UI build passed. [CI 39389999268](https://github.com/kongjiestak/pixora/actions/runs/39389999268) passed clean installs, tests, Docker build and runtime smoke. One existing Starlette TestClient deprecation warning remains.
+
+An independent loopback-only VPS beta migrated a private online SQLite copy. Existing v1 snapshot rows, original device rows/scopes and session rows compared equal to the migration backup. An installed, non-editable Python 0.2.0.dev1 package collected two actual Linux host CPU/memory/root-disk observations and delivered them to v2. Latest, pagination and unauthorized requests returned expected results. Restoring the pre-v2 backup to a new path and running the prior v0.1 image read the original quotas successfully. Production health remained OK; production has not been upgraded to v2.
+
+The beta browser rendered real system metrics and two history rows, with no horizontal document overflow at 956×500. This is desktop responsive verification, not iPhone V0.2 acceptance. Test observations are point-in-time samples; continuous collector operation and production promotion remain pending. No formal V0.2 Release is claimed. See [contract, retention and rollback](V0.2.md).
