@@ -29,7 +29,8 @@
     "connect": "Connect / Refresh",
     "disconnect": "Disconnect",
     "display": "Display mode",
-    "exit": "Exit display"
+    "exit": "Exit display",
+    "connectHint": "Real data is not connected. Enter a device read-only token or scan your administrator’s private pairing QR code. This screen is not yet ready for live-data acceptance."
   },
   "status": {
     "connected": "Service connected",

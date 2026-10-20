@@ -34,7 +34,7 @@ function share(){if(config.value.shared)disconnect();save()}
 async function wakeScreen(){try{if(kiosk.value&&document.visibilityState==='visible')wake=await navigator.wakeLock?.request('screen')}catch{}}
 async function exit(){kiosk.value=false;try{if(document.fullscreenElement)await document.exitFullscreen()}catch{};wake?.release()}
 async function display(){kiosk.value=true;try{await document.documentElement.requestFullscreen?.()}catch{};wakeScreen()}
-onMounted(()=>{timer=setInterval(load,30000);tick=setInterval(()=>clock.value=new Date(),1000);document.addEventListener('visibilitychange',wakeScreen);if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{})})
+onMounted(()=>{const pairing=new URLSearchParams(location.hash.slice(1));if(pairing.has('token')){const incoming=pairing.get('token');history.replaceState(null,'',location.pathname+location.search);if(incoming&&/^[A-Za-z0-9_-]{32,128}$/.test(incoming)){token.value=incoming;mode.value='real';config.value.shared=false;load()}}timer=setInterval(load,30000);tick=setInterval(()=>clock.value=new Date(),1000);document.addEventListener('visibilitychange',wakeScreen);if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{})})
 onUnmounted(()=>{clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',wakeScreen)})
 </script>
 <template><main :class="[config.theme,{kiosk}]">
@@ -48,6 +48,7 @@ onUnmounted(()=>{clearInterval(timer);clearInterval(tick);cancel();wake?.release
 <button :disabled="busy||!token||config.shared" @click="load">{{t('config.connect')}}</button><button @click="disconnect">{{t('config.disconnect')}}</button>
 <label>{{t('config.data')}}<select v-model="mode" @change="changeMode"><option value="real">{{t('config.real')}}</option><option value="demo">{{t('config.demo')}}</option></select></label>
 </section>
+<p v-if="!connected&&!token" class="warning" role="status">{{t('config.connectHint')}}</p>
 <p v-if="mode==='demo'" class="warning">{{t('data.demo')}}</p>
 <p v-if="error" class="warning" role="alert">{{t(error.key,error.params||{})}}</p>
 <div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" :data="data" :connected="connected" :clock="clock"/></div>
