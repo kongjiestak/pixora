@@ -7,7 +7,8 @@ import {deviceConfig, persist, preference} from './locale-core.js'
 const {t,locale}=useI18n()
 let storage;try{storage=window.localStorage}catch{}
 const config=ref(deviceConfig(preference(storage,'pixora-device',preference(storage,'apm-device','{}'))))
-const rememberDevice=ref(true),remembered=ref(false),sessionExpiry=ref(''),authBusy=ref(false),logoutPending=ref(preference(storage,'pixora-logout-pending','')==='1')
+const secureSession=location.protocol==='https:'
+const rememberDevice=ref(secureSession),remembered=ref(false),sessionExpiry=ref(''),authBusy=ref(false),logoutPending=ref(preference(storage,'pixora-logout-pending','')==='1')
 const token=ref(''),mode=ref('real'),data=ref(null),error=ref(null),connected=ref(false),busy=ref(false),clock=ref(new Date()),kiosk=ref(new URLSearchParams(location.search).has('kiosk'))
 const displayLayout=ref(preference(storage,'pixora-display-layout','clock-quota')==='quota'?'quota':'clock-quota'),showDisplayTools=ref(false),wakeState=ref('idle')
 const widgets=computed(()=>kiosk.value?displayWidgets(displayLayout.value,config.value.shared):visibleWidgets(config.value.layout,config.value.shared))
@@ -39,6 +40,7 @@ async function sessionRequest(method, headers={}){
 }
 function pendingLogout(value){logoutPending.value=value;persist(storage,'pixora-logout-pending',value?'1':'')}
 async function clearRemoteSession(){
+ if(!secureSession){pendingLogout(false);return}
  pendingLogout(true)
  const response=await sessionRequest('DELETE')
  if(!response.ok)throw Error('logout failed')
@@ -66,6 +68,7 @@ async function disconnect(){
  try{await clearRemoteSession()}catch{error.value={key:'auth.logoutFailed'}}
 }
 async function restoreSession(){
+ if(!secureSession){pendingLogout(false);return}
  if(config.value.shared||logoutPending.value){await disconnect();return}
  const current=generation
  try{
@@ -114,7 +117,7 @@ onUnmounted(()=>{clearInterval(timer);clearInterval(tick);cancel();wake?.release
 <label>{{t('config.layout')}}<select v-model="config.layout" @change="save"><option value="overview">{{t('config.overview')}}</option><option value="focus">{{t('config.focus')}}</option><option value="public">{{t('config.public')}}</option></select></label>
 <label><input type="checkbox" v-model="config.shared" @change="share">{{t('config.shared')}}</label>
 <label v-if="!config.shared">{{t('config.token')}}<input v-model="token" type="password" autocomplete="off" :placeholder="t('config.tokenHint')" @keyup.enter="connect"></label>
-<label v-if="!config.shared"><input type="checkbox" v-model="rememberDevice" :disabled="authBusy">{{t('auth.remember')}}</label>
+<label v-if="!config.shared"><input type="checkbox" v-model="rememberDevice" :disabled="authBusy||!secureSession">{{t('auth.remember')}}</label>
 <button :disabled="busy||authBusy||(!token&&!remembered)||config.shared" @click="connect">{{t('config.connect')}}</button><button @click="disconnect">{{t('config.disconnect')}}</button>
 <label>{{t('config.data')}}<select v-model="mode" @change="changeMode"><option value="real">{{t('config.real')}}</option><option value="demo">{{t('config.demo')}}</option></select></label>
 </section>
