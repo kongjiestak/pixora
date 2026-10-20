@@ -2,13 +2,15 @@
 import {ref, computed, watch, onMounted, onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import Widget from './Widget.vue'
-import {visibleWidgets} from './widgets.js'
+import {visibleWidgets,displayWidgets} from './widgets.js'
 import {deviceConfig, persist, preference} from './locale-core.js'
 const {t,locale}=useI18n()
 let storage;try{storage=window.localStorage}catch{}
 const config=ref(deviceConfig(preference(storage,'pixora-device',preference(storage,'apm-device','{}'))))
 const token=ref(''),mode=ref('real'),data=ref(null),error=ref(null),connected=ref(false),busy=ref(false),clock=ref(new Date()),kiosk=ref(new URLSearchParams(location.search).has('kiosk'))
-const widgets=computed(()=>visibleWidgets(config.value.layout,config.value.shared))
+const displayLayout=ref(preference(storage,'pixora-display-layout','clock-quota')==='quota'?'quota':'clock-quota'),showDisplayTools=ref(false),wakeState=ref('idle')
+const widgets=computed(()=>kiosk.value?displayWidgets(displayLayout.value,config.value.shared):visibleWidgets(config.value.layout,config.value.shared))
+function saveDisplay(){persist(storage,'pixora-display-layout',displayLayout.value)}
 let timer,tick,controller,wake,generation=0
 function save(){persist(storage,'pixora-device',JSON.stringify(config.value))}
 function language(){persist(storage,'pixora-locale',locale.value)}
@@ -31,14 +33,26 @@ async function load(){
 function changeMode(){cancel();data.value=null;connected.value=false;load()}
 function disconnect(){cancel();token.value='';data.value=null;connected.value=false;error.value=null}
 function share(){if(config.value.shared)disconnect();save()}
-async function wakeScreen(){try{if(kiosk.value&&document.visibilityState==='visible')wake=await navigator.wakeLock?.request('screen')}catch{}}
-async function exit(){kiosk.value=false;try{if(document.fullscreenElement)await document.exitFullscreen()}catch{};wake?.release()}
-async function display(){kiosk.value=true;try{await document.documentElement.requestFullscreen?.()}catch{};wakeScreen()}
-onMounted(()=>{const pairing=new URLSearchParams(location.hash.slice(1));if(pairing.has('token')){const incoming=pairing.get('token');history.replaceState(null,'',location.pathname+location.search);if(incoming&&/^[A-Za-z0-9_-]{32,128}$/.test(incoming)){token.value=incoming;mode.value='real';config.value.shared=false;load()}}timer=setInterval(load,30000);tick=setInterval(()=>clock.value=new Date(),1000);document.addEventListener('visibilitychange',wakeScreen);if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{})})
+async function wakeScreen(){
+ if(!kiosk.value||document.visibilityState!=='visible'||wake||wakeState.value==='requesting')return
+ if(!navigator.wakeLock?.request){wakeState.value='unsupported';return}
+ wakeState.value='requesting'
+ try{
+  const lock=await navigator.wakeLock.request('screen')
+  if(!kiosk.value||document.visibilityState!=='visible'){await lock.release();wakeState.value='idle';return}
+  wake=lock;wakeState.value='active'
+  lock.addEventListener('release',()=>{if(wake===lock){wake=null;wakeState.value=kiosk.value?'released':'idle'}})
+ }catch{wakeState.value=kiosk.value?'failed':'idle'}
+}
+async function exit(){kiosk.value=false;showDisplayTools.value=false;try{if(document.fullscreenElement)await document.exitFullscreen()}catch{};wake?.release();wakeState.value='idle'}
+async function display(){kiosk.value=true;showDisplayTools.value=false;try{await document.documentElement.requestFullscreen?.()}catch{};wakeScreen()}
+onMounted(()=>{wakeScreen();const pairing=new URLSearchParams(location.hash.slice(1));if(pairing.has('token')){const incoming=pairing.get('token');history.replaceState(null,'',location.pathname+location.search);if(incoming&&/^[A-Za-z0-9_-]{32,128}$/.test(incoming)){token.value=incoming;mode.value='real';config.value.shared=false;load()}}timer=setInterval(load,30000);tick=setInterval(()=>clock.value=new Date(),1000);document.addEventListener('visibilitychange',wakeScreen);if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{})})
 onUnmounted(()=>{clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',wakeScreen)})
 </script>
-<template><main :class="[config.theme,{kiosk}]">
-<header><div><p class="eyebrow">Pixora · {{t('app.stage')}}</p><h1>{{config.name||t('app.defaultName')}}<span>{{t('app.tagline')}}</span></h1></div><div class="options"><label>{{t('config.language')}}<select v-model="locale" @change="language"><option value="en-US" lang="en">{{t('language.english')}}</option><option value="zh-CN" lang="zh-CN">{{t('language.chinese')}}</option></select></label><button @click="kiosk?exit():display()">{{t(kiosk?'config.exit':'config.display')}}</button></div></header>
+<template><main :class="[config.theme,{kiosk},kiosk?'display-'+displayLayout:'']">
+<div v-if="kiosk" class="display-bar"><span class="display-brand">Pixora <span>{{config.name}}</span></span><div class="display-actions"><span class="wake-status" role="status">{{t('display.wake_'+wakeState)}}</span><button class="secondary" :aria-expanded="showDisplayTools" @click="showDisplayTools=!showDisplayTools">{{t('display.settings')}}</button><button class="secondary" @click="exit">{{t('config.exit')}}</button></div></div>
+<section v-if="kiosk&&showDisplayTools" class="display-tools"><label>{{t('display.layout')}}<select v-model="displayLayout" @change="saveDisplay"><option value="clock-quota">{{t('display.clockQuota')}}</option><option value="quota">{{t('display.quotaOnly')}}</option></select></label><button v-if="wakeState!=='active'" @click="wakeScreen">{{t('display.retryWake')}}</button><p>{{t('display.installHint')}}</p></section>
+<header v-if="!kiosk"><div><p class="eyebrow">Pixora · {{t('app.stage')}}</p><h1>{{config.name||t('app.defaultName')}}<span>{{t('app.tagline')}}</span></h1></div><div class="options"><label>{{t('config.language')}}<select v-model="locale" @change="language"><option value="en-US" lang="en">{{t('language.english')}}</option><option value="zh-CN" lang="zh-CN">{{t('language.chinese')}}</option></select></label><button @click="kiosk?exit():display()">{{t(kiosk?'config.exit':'config.display')}}</button></div></header>
 <section v-if="!kiosk" class="connection">
 <label>{{t('config.name')}}<input v-model="config.name" maxlength="60" @change="save"></label>
 <label>{{t('config.theme')}}<select v-model="config.theme" @change="save"><option value="dark">{{t('config.dark')}}</option><option value="light">{{t('config.light')}}</option></select></label>
@@ -52,5 +66,6 @@ onUnmounted(()=>{clearInterval(timer);clearInterval(tick);cancel();wake?.release
 <p v-if="mode==='demo'" class="warning">{{t('data.demo')}}</p>
 <p v-if="error" class="warning" role="alert">{{t(error.key,error.params||{})}}</p>
 <div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" :data="data" :connected="connected" :clock="clock"/></div>
+<p v-if="kiosk" class="display-sync" :class="{'offline':!connected}">{{t(connected?'status.connected':'status.offline')}} · {{t('status.sync',{time:data?new Date(data.server_time).toLocaleTimeString(locale):t('widget.notCollected')})}}</p>
 <footer v-if="!kiosk">{{t('app.support')}}<br>{{t('app.principle')}}<br>{{t('app.footer')}}<br>{{t('app.install')}} {{t('app.privacy')}}<br>{{t('app.brand')}}</footer>
 </main></template>

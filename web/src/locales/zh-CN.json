@@ -83,5 +83,19 @@
   "language": {
     "english": "English",
     "chinese": "简体中文"
+  },
+  "display": {
+    "settings": "显示设置",
+    "layout": "显示布局",
+    "clockQuota": "时钟＋额度",
+    "quotaOnly": "仅额度",
+    "retryWake": "尝试保持常亮",
+    "installHint": "iPhone 可在 Safari 分享菜单中“添加到主屏幕”后打开。常亮受浏览器、省电模式及系统限制。",
+    "wake_idle": "常亮未启用",
+    "wake_requesting": "正在请求常亮",
+    "wake_active": "已请求保持常亮",
+    "wake_unsupported": "浏览器不支持常亮",
+    "wake_released": "常亮已暂停",
+    "wake_failed": "常亮未获允许"
   }
 }

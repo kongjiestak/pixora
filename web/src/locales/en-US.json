@@ -83,5 +83,19 @@
   "language": {
     "english": "English",
     "chinese": "简体中文"
+  },
+  "display": {
+    "settings": "Display settings",
+    "layout": "Display layout",
+    "clockQuota": "Clock + quota",
+    "quotaOnly": "Quota only",
+    "retryWake": "Try keeping screen awake",
+    "installHint": "On iPhone, use Safari Share → Add to Home Screen. Wake lock depends on the browser, power mode and system.",
+    "wake_idle": "Wake lock off",
+    "wake_requesting": "Requesting wake lock",
+    "wake_active": "Wake lock active",
+    "wake_unsupported": "Wake lock unsupported",
+    "wake_released": "Wake lock paused",
+    "wake_failed": "Wake lock unavailable"
   }
 }
