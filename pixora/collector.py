@@ -8,9 +8,15 @@ import httpx
 from pixora.plugins import PLUGINS
 from pixora.settings import setting
 
+def retry_delay(interval, failures, maximum=300):
+    return interval if not failures else min(maximum, interval * 2**min(failures, 10))
+
+
 async def run(args):
     if args.interval < 30:
         raise SystemExit("interval must be >= 30 seconds")
+    if not 30 <= args.max_retry_delay <= 3600:
+        raise SystemExit("max retry delay must be between 30 and 3600 seconds")
     token = setting("WRITE_TOKEN", "")
     if not args.print_only:
         url = urlparse(args.server)
@@ -35,18 +41,19 @@ async def run(args):
             print("snapshot delivered", flush=True)
         except httpx.HTTPError:
             failures += 1
-            print("delivery failed; check server, network and token (details suppressed)", flush=True)
+            print(f"delivery failed; retry within {retry_delay(args.interval, failures, args.max_retry_delay)+5} seconds; check server, network and token (details suppressed)", flush=True)
             if args.once:
                 raise SystemExit(1)
         if args.once:
             return
-        await asyncio.sleep(min(3600, args.interval*2**min(failures, 4)) + random.uniform(0, 5))
+        await asyncio.sleep(retry_delay(args.interval, failures, args.max_retry_delay) + random.uniform(0, 5))
 
 def main():
-    p = argparse.ArgumentParser(description="Pixora Mac outbound collector")
+    p = argparse.ArgumentParser(description="Pixora outbound collector")
     p.add_argument("--plugin", choices=PLUGINS, default="codex")
     p.add_argument("--server", default=setting("SERVER", "http://127.0.0.1:8000"))
     p.add_argument("--interval", type=int, default=120)
+    p.add_argument("--max-retry-delay", type=int, default=300, help="failure backoff cap in seconds (30–3600; default 300)")
     p.add_argument("--once", action="store_true")
     p.add_argument("--print-only", action="store_true")
     p.add_argument("--allow-private-http", action="store_true")
