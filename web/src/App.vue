@@ -2,6 +2,7 @@
 import {ref, computed, watch, onMounted, onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import Widget from './Widget.vue'
+import {displayViewport} from './display-viewport.js'
 import {visibleWidgets,displayWidgets} from './widgets.js'
 import {deviceConfig, persist, preference} from './locale-core.js'
 const {t,locale}=useI18n()
@@ -13,7 +14,8 @@ const token=ref(''),mode=ref('real'),data=ref(null),error=ref(null),connected=re
 const displayLayout=ref(preference(storage,'pixora-display-layout','clock-quota')==='quota'?'quota':'clock-quota'),showDisplayTools=ref(false),wakeState=ref('idle')
 const widgets=computed(()=>kiosk.value?displayWidgets(displayLayout.value,config.value.shared):visibleWidgets(config.value.layout,config.value.shared))
 function saveDisplay(){persist(storage,'pixora-display-layout',displayLayout.value)}
-let timer,tick,controller,wake,generation=0
+let timer,tick,controller,wake,viewport,generation=0
+watch(kiosk,()=>viewport?.settle(),{flush:'post'})
 function save(){persist(storage,'pixora-device',JSON.stringify(config.value))}
 function language(){persist(storage,'pixora-locale',locale.value)}
 watch(locale,()=>{document.documentElement.lang=locale.value;document.documentElement.dir='ltr'},{immediate:true})
@@ -96,6 +98,7 @@ async function wakeScreen(){
 async function exit(){kiosk.value=false;showDisplayTools.value=false;try{if(document.fullscreenElement)await document.exitFullscreen()}catch{};wake?.release();wakeState.value='idle'}
 async function display(){kiosk.value=true;showDisplayTools.value=false;try{await document.documentElement.requestFullscreen?.()}catch{};wakeScreen()}
 onMounted(async()=>{
+ viewport=displayViewport(window,()=>kiosk.value)
  wakeScreen();timer=setInterval(load,30000);tick=setInterval(()=>clock.value=new Date(),1000)
  document.addEventListener('visibilitychange',wakeScreen)
  if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{})
@@ -105,7 +108,7 @@ onMounted(async()=>{
   token.value=incoming;mode.value='real';config.value.shared=false;save();await connect()
  }else await restoreSession()
 })
-onUnmounted(()=>{clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',wakeScreen)})
+onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',wakeScreen)})
 </script>
 <template><main :class="[config.theme,{kiosk},kiosk?'display-'+displayLayout:'']">
 <div v-if="kiosk" class="display-bar"><span class="display-brand">Pixora <span>{{config.name}}</span></span><div class="display-actions"><span class="wake-status" role="status">{{t('display.wake_'+wakeState)}}</span><button class="secondary" :aria-expanded="showDisplayTools" @click="showDisplayTools=!showDisplayTools">{{t('display.settings')}}</button><button class="secondary" @click="exit">{{t('config.exit')}}</button></div></div>
