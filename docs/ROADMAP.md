@@ -8,7 +8,7 @@ Acceptance-driven, no promised dates. Current status: **Early Development**, pac
 |---|---|---|
 | V0.1 | Real Codex → API → web; EN/ZH; widgets; PWA/Kiosk; trusted local privacy | Implemented; VPS deployment, iPhone PWA and home collector recovery accepted. No stable Pixora Release |
 | V0.2 | Generic Observation v2, SQLite migration, PVE/host read-only connector, history | Implemented on main; migration/rollback, real Linux host widget/history and iPhone + Android display accepted; dedicated PVE API deferred |
-| V0.3 | CI/GitHub and calendar/tasks/weather/RSS | In development: public GitHub, RSS/Atom and local tasks implemented; calendar/weather/editor remain planned |
+| V0.3 | CI/GitHub and calendar/tasks/weather/RSS | In development: public GitHub, RSS/Atom and local tasks implemented; local calendar/weather and quota-ring display implemented; account sync deferred, task editor paused per owner |
 | V0.4 | Layout editor, server device config, per-device scoped tokens and revocation | Planned; public devices must not retrieve private fields via API |
 | V0.5 | Private mail summaries, life/bill reminders, travel, budgets, goals | Planned; minimal data retention, connector revocation and screen lock |
 | V0.7 | Authorized automation and Home Assistant interaction | Planned; separate command permissions, audit, confirmation and idempotency |
