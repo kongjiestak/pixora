@@ -18,9 +18,9 @@ Docker Compose uses the same SQLite volume as the server:
 docker compose exec monitor python -m pixora.devices create --name public-screen --provider codex --mode demo --days 7
 ```
 
-The JSON response contains `id`, `token`, `expires_at`. Save the token privately once and enter it into the existing dashboard read-token field. Do not paste it into issues, URLs or screenshots. The CLI output is sensitive; the token cannot be retrieved later. Default mode is **demo only** if `--mode` is omitted. Repeat `--provider` / `--mode` for multiple scopes. Supported providers are currently codex and chatgpt; chatgpt real quotas remain unavailable.
+The JSON response contains `id`, `token`, `expires_at`. Save the token privately once and enter it into the existing dashboard read-token field. Do not paste it into issues, public URLs or screenshots. A locally generated private pairing QR may use a promptly cleared fragment; treat the QR as a credential. The CLI output is sensitive; the token cannot be retrieved later. Default mode is **demo only** if `--mode` is omitted. Repeat `--provider` / `--mode` for multiple scopes. Supported providers are currently codex and chatgpt; chatgpt real quotas remain unavailable.
 
-输出含 id、token 和 expires_at。令牌只显示这一次，私下保存并填入网页已有的只读令牌框；不要贴到 Issue、URL、截图或日志。省略 --mode 时默认仅演示权限。可重复 --provider/--mode。网页须选择获授权的真实或演示模式；无权限返回 403，未知/到期/撤销令牌返回 401。共享模式仍会清除令牌；如需持续演示，可使用独立 demo 令牌，不授予 real。
+输出含 id、token 和 expires_at。令牌只显示这一次，私下保存并填入网页已有的只读令牌框；不要贴到 Issue、URL、截图或日志。省略 --mode 时默认仅演示权限。可重复 --provider/--mode。网页须选择获授权的真实或演示模式；无权限返回 403，未知/到期/撤销令牌返回 401。共享模式会清除令牌并注销当前浏览器持久会话；如需持续演示，可使用独立 demo 令牌，不授予 real。
 
 ## List / revoke / 列表与撤销
 
@@ -37,4 +37,6 @@ In Docker prefix with `docker compose exec monitor`. List never returns tokens o
 
 Existing global `PIXORA_READ_TOKEN` remains a broad compatibility credential by default; it does not acquire device restrictions. After provisioning and switching every display, set `PIXORA_ALLOW_LEGACY_READ_TOKEN=false` in .env and recreate the service (`docker compose up -d`). This disables the broad read credential without affecting the collector write credential. Keep distinct read/write values configured for compatibility with startup validation. A stale or malformed legacy-enable value fails closed (only `true` enables it).
 
-旧全局只读令牌默认继续有效且可读全部数据。为所有屏幕配置独立令牌后，设置上述开关为 false 并重建服务，关闭宽权限入口；采集写令牌不受影响。启动校验仍要求独立读写配置。设备管理网页、自动配对、逐字段权限与服务端布局同步留待后续。
+旧全局只读令牌默认继续有效且可读全部数据。为所有屏幕配置独立令牌后，设置上述开关为 false 并重建服务，关闭宽权限入口；采集写令牌不受影响。启动校验仍要求独立读写配置。已支持私密扫码与HTTPS持久设备会话，见[设备登录](device-sessions.md)；设备管理网页、一次性邀请配对、逐字段权限与服务端布局同步留待后续。
+
+Remembered sessions inherit this device policy and expiry. Revoking the device invalidates all its browser sessions. See [device sessions](device-sessions.md).

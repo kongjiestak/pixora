@@ -6,7 +6,7 @@
     "principle": "Your Screen. Your Data. Your Control.",
     "defaultName": "My information screen",
     "footer": "AI · Systems · Developer · Personal · Automation (roadmap)",
-    "privacy": "Settings stay on this browser. Tokens and observations are kept in memory only.",
+    "privacy": "Settings stay in this browser. Remembered devices use a secure cookie, not localStorage tokens. Observations are not cached offline.",
     "install": "Install from your browser menu on HTTPS or localhost.",
     "brand": "Working brand; trademark clearance pending."
   },
@@ -19,7 +19,7 @@
     "overview": "Overview",
     "focus": "Focus",
     "public": "Public screen",
-    "shared": "Shared screen (clear token and hide private widgets)",
+    "shared": "Shared screen (sign out and hide private widgets)",
     "token": "Read-only token",
     "tokenHint": "Kept in this page memory only",
     "language": "Language",
@@ -27,7 +27,7 @@
     "real": "Real observations",
     "demo": "Demo data",
     "connect": "Connect / Refresh",
-    "disconnect": "Disconnect",
+    "disconnect": "Sign out this device",
     "display": "Display mode",
     "exit": "Exit display",
     "connectHint": "Real data is not connected. Enter a device read-only token or scan your administrator’s private pairing QR code. This screen is not yet ready for live-data acceptance."
@@ -97,5 +97,12 @@
     "wake_unsupported": "Wake lock unsupported",
     "wake_released": "Wake lock paused",
     "wake_failed": "Wake lock unavailable"
+  },
+  "auth": {
+    "remember": "Remember this device (up to 30 days)",
+    "remembered": "Device signed in · Expires {time}",
+    "expired": "Device authorization is invalid or expired. Scan your pairing QR again.",
+    "loginFailed": "Device sign-in failed. Check the connection and allow cookies for this site.",
+    "logoutFailed": "Data cleared on this page, but server sign-out is incomplete. Reconnect and select Sign out this device again."
   }
 }

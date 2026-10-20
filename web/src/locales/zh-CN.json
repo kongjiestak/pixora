@@ -6,7 +6,7 @@
     "principle": "你的屏幕，你的数据，由你掌控。",
     "defaultName": "我的信息终端",
     "footer": "AI · 系统 · 开发者 · 个人信息 · 自动化（后续规划）",
-    "privacy": "设备设置仅存当前浏览器，令牌和观测仅存内存。",
+    "privacy": "设置保存在当前浏览器；记住设备使用安全 Cookie，令牌不存 localStorage，观测不离线缓存。",
     "install": "在 HTTPS 或 localhost 下通过浏览器菜单安装。",
     "brand": "当前为工作品牌，商标审查尚未完成。"
   },
@@ -19,7 +19,7 @@
     "overview": "总览",
     "focus": "专注",
     "public": "公共屏幕",
-    "shared": "共享屏幕（清除令牌、隐藏私人组件）",
+    "shared": "共享屏幕（退出设备登录、隐藏私人组件）",
     "token": "只读令牌",
     "tokenHint": "仅保存于当前页面内存",
     "language": "语言",
@@ -27,7 +27,7 @@
     "real": "真实观测",
     "demo": "演示数据",
     "connect": "连接 / 刷新",
-    "disconnect": "断开",
+    "disconnect": "退出此设备",
     "display": "显示模式",
     "exit": "退出显示",
     "connectHint": "尚未连接真实数据。请输入设备只读令牌，或扫描管理员提供的私密配对二维码。此页面尚不能用于真实额度验收。"
@@ -97,5 +97,12 @@
     "wake_unsupported": "浏览器不支持常亮",
     "wake_released": "常亮已暂停",
     "wake_failed": "常亮未获允许"
+  },
+  "auth": {
+    "remember": "记住此设备（最长30天）",
+    "remembered": "此设备已登录 · 有效至 {time}",
+    "expired": "设备授权无效或已过期，请重新扫码连接。",
+    "loginFailed": "设备登录失败，请检查网络并允许本站 Cookie 后重试。",
+    "logoutFailed": "本页已清除数据，但服务器退出尚未完成。请联网后点击“退出此设备”重试。"
   }
 }

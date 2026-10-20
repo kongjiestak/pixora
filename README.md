@@ -28,6 +28,7 @@ Actual running build, **Demo Data only** (not account quotas):
 | Browser device settings | Local only; name, theme, layout, sharing; no server device-management UI |
 | Responsive display / Kiosk | Implemented; browser viewport checks; full-screen and wake lock are best effort |
 | PWA | Manifest, icons and offline public shell; physical phone installation still unverified |
+| Remembered device login | HTTPS HttpOnly cookie, expiry, logout and live device revocation; [session guide](docs/device-sessions.md) |
 | Shared display privacy | Local filter plus opt-in server provider/mode scoped tokens; [device guide](docs/DEVICES.md) |
 | Docker Compose | Provided; current validation is recorded in [verification](docs/VERIFICATION.md) |
 | System / developer / personal integrations / controls / ESP32 | Roadmap, except local clock and sync status; no hardware firmware or simulator in this revision |
@@ -50,7 +51,7 @@ npm --prefix web run build
 uvicorn pixora.server:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-Open [localhost](http://127.0.0.1:8000). Enter `PIXORA_READ_TOKEN` from your local `.env`. The token stays in page memory. Open another terminal in the same directory:
+Open [localhost](http://127.0.0.1:8000). Enter `PIXORA_READ_TOKEN` from your local `.env`. For this legacy-token localhost example, uncheck **Remember this device**; the token stays in page memory. Scoped device tokens can instead establish a persistent HTTPS session (see [device sessions](docs/device-sessions.md)). Open another terminal in the same directory:
 
 ```sh
 source .venv/bin/activate
@@ -81,8 +82,8 @@ Phones need a deliberately configured LAN/private-network address. Full PWA supp
 
 ## Data and security
 
-- `POST /api/v1/snapshots`: collector write token only. `GET /api/v1/device?mode=real|demo`: display read token only. `/healthz` is public.
-- Bearer headers, distinct 32+ character tokens, no token in URLs; local clock, receipt time, collection time, reset time and stale states are distinguished.
+- `POST /api/v1/snapshots`: collector write token only. `GET /api/v1/device?mode=real|demo`: display read token or scoped read-only session. `/healthz` is public.
+- Bearer headers for collectors/manual tokens; optional scoped HttpOnly HTTPS sessions for displays, distinct 32+ character tokens, no query tokens; local clock, receipt time, collection time, reset time and stale states are distinguished.
 - `collected_at` is returned alongside legacy `observed_at`; ingest accepts either. Structured `reason_code` enables translation. Unknown values never mean zero remaining.
 - Credentials remain with Codex on the collector Mac. No cookies, raw RPC, prompts, private account details or personal databases are shipped. API responses are never cached by the service worker.
 - Independent display tokens now enforce provider/mode scope, expiry and live revocation on the server. Provision with the local CLI; [device guide](docs/DEVICES.md). The legacy global read token still sees all data until explicitly disabled. Shared-screen UI filtering alone is not access control. No control commands are implemented.

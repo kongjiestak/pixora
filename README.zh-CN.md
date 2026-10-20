@@ -50,7 +50,7 @@ npm --prefix web run build
 uvicorn pixora.server:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-打开[本机页面](http://127.0.0.1:8000)，填写本机 `.env` 的 `PIXORA_READ_TOKEN`，令牌仅存页面内存。第二终端同目录：
+打开[本机页面](http://127.0.0.1:8000)，填写本机 `.env` 的 `PIXORA_READ_TOKEN`，此 localhost 全局令牌示例须取消“记住此设备”，令牌仅存页面内存。独立设备令牌可在 HTTPS 下换取持久只读会话，见[设备登录](docs/device-sessions.md)。第二终端同目录：
 
 ```sh
 source .venv/bin/activate
@@ -81,8 +81,8 @@ docker compose up -d --build
 
 ## 数据与安全
 
-- 写端点 `POST /api/v1/snapshots` 只接受采集令牌；读端点 `GET /api/v1/device?mode=real|demo` 只接受只读令牌；`/healthz` 公开。
-- 两个不同的 32 字符以上随机令牌通过 Bearer 头传递，不放 URL。显示采集、接收、重置时间与过期状态，不把未知值显示为零。
+- 写端点 `POST /api/v1/snapshots` 只接受采集令牌；读端点 `GET /api/v1/device?mode=real|demo` 接受只读令牌或受限设备会话；`/healthz` 公开。
+- 两个不同的 32 字符以上随机令牌通过 Bearer 头传递，不放查询串或日志；私密扫码配对仅使用进入后立即清除的 fragment。显示采集、接收、重置时间与过期状态，不把未知值显示为零。
 - `collected_at` 与旧版 `observed_at` 并存；写入可使用任一字段；`reason_code` 提供可翻译状态。
 - Codex 凭据留在 Mac，本项目不传输 Cookie、原始 RPC、提示词或私人账号资料。服务工作线程不缓存 API。
 - 已支持服务端逐设备令牌、数据源/真实演示范围、期限与即时撤销，见[设备指南](docs/DEVICES.md)。旧全局只读令牌默认仍可读取全部额度，迁移后须显式禁用。共享模式本身仍是本机过滤。没有控制命令。

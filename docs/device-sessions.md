@@ -1,0 +1,9 @@
+# Remembered device sessions / 记住设备
+
+On HTTPS, scoped device pairing creates a Secure, HttpOnly, SameSite=Strict `__Host-pixora_session` cookie with Path=/ and no Domain. Raw pairing tokens are cleared from page memory after exchange, never saved in localStorage. SQLite stores only the SHA256 session digest, device ID and expiry. Sessions expire at the earlier of 30 days or device authorization expiry; they do not silently extend.
+
+The browser restores the session after refresh/reopening. Shared-screen mode and **Sign out this device** clear displayed data immediately and DELETE the current session. If offline, the UI reports incomplete logout and stores a non-secret pending-logout flag to retry before restoring any session. Keep the device online and retry sign-out before handing it to someone else. Other browser sessions for the same device remain valid until local CLI device revocation or expiry. `pixora-device revoke DEVICE_ID` invalidates all device sessions on the next API request.
+
+POST /api/v1/session exchanges a scoped Bearer token; GET returns session metadata; DELETE revokes the cookie session. Mutations require an explicit exact HTTPS Origin matching Host, with no CORS allowance. Global read/write tokens cannot create sessions. Sessions cannot post observations or exceed their parent device provider/mode scope. At most 20 sessions are retained per device. The app origin must be served directly as HTTPS with the original Host preserved by the proxy. Plain localhost HTTP demos must uncheck Remember this device. PWA/browser cookie separation and browser data-clearing policies may require pairing again, particularly when installing into a different app context.
+
+中文：在 HTTPS 下扫码或输入独立设备令牌，并勾选“记住此设备”，刷新或重新打开可自动连接。有效期最长30天，且不会超过设备令牌到期日。点击“退出此设备”注销当前浏览器，切换共享屏幕也会退出；断网时会提示服务器退出未完成，联网重试后才能确认注销。管理员撤销设备会令该设备全部会话失效。二维码仍是可重复使用的凭据，需保密；退出浏览器会话不会销毁二维码。全局只读令牌/HTTP演示不支持持久设备登录。清理浏览器数据、隐私模式或Safari与独立PWA之间的隔离可能要求重新配对。
