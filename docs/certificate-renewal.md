@@ -1,0 +1,13 @@
+# Verified certificate renewal / 证书自动续期
+
+For a host already using TCP 443 for another service, Pixora can keep its separate HTTPS port and use acme.sh standalone HTTP-01 on otherwise unused TCP 80. Do not permanently occupy that port or replace another service's ACME configuration. Keep a dedicated `--config-home`, certificate key, installation target and renewal timer. DNS must point to this host and port 80 must already be reachable for validation. No DNS API credentials are required for this workflow.
+
+Test issuance and forced renewal against the isolated staging directory first; staging certificates must never enter the production trust store or serving proxy. Issue the production certificate into its own directory. Configure `--install-cert` with incoming key/fullchain paths and a deploy hook invoking `scripts/deploy_tls.py --base <private-deployment-directory> --domain <hostname>`. Run daily `acme.sh --cron` with the same config home and follow it with the deployment check. A skipped not-due renewal is a check, not evidence that a new production certificate was issued. Keep private logs, failure state, a persistent systemd timer and bounded log rotation.
+
+The deploy gate verifies at least seven days of validity, hostname, system CA chain and matching private/public key. It writes a new certificate generation and Caddy config atomically, validates the candidate, gracefully reloads over a container-private Unix socket, and verifies the actual served certificate fingerprint plus HTTPS health. A failed reload attempts to restore the previous config. Retain valid previous generations for rollback. Mount only the deployed certificates and config directory read-only into Caddy, not the ACME account directory; do not publish the admin socket or a TCP admin API. The Caddy container needs root-readable private files and its configured NET_BIND_SERVICE capability when its executable has that file capability.
+
+Validate real certificate rotation using two already trusted, valid certificates, then restore the newest certificate; confirm the proxy process did not restart. Also test rejecting an untrusted staging candidate without changing the active configuration. Preserve existing services and their certificate configuration checksums. Existing browser sessions and collector credentials should not change during renewal.
+
+中文：续期必须包含签发/更新、证书与私钥校验、加载、核对实际提供的证书，以及失败记录。测试CA只能在隔离目录使用，不能关闭TLS验证或安装测试根证书。定时任务需启用Persistent，服务器恢复后补做检查。不得把“尚未到期所以跳过”称为成功续期；应分别记录测试环境强制续期、生产新证书签发及上线、定时任务实际执行结果。
+
+References: [acme.sh issuance and install-cert](https://github.com/acmesh-official/acme.sh), [acme.sh options](https://github.com/acmesh-official/acme.sh/wiki/Options-and-Params), [Caddy reload/validate](https://caddyserver.com/docs/command-line).
