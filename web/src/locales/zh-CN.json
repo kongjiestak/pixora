@@ -37,7 +37,7 @@
     "offline": "离线 / 尚未连接",
     "cached": "离线缓存",
     "stale": "数据过期",
-    "fresh": "新鲜观测",
+    "fresh": "数据正常",
     "unavailable": "不可用",
     "sync": "最近服务同步：{time} · 每 30 秒刷新",
     "safe": "此组件不包含账户额度或私人信息。",
@@ -61,7 +61,9 @@
     "days": "{count} 天窗口",
     "unknownWindow": "窗口长度未知",
     "collected": "采集时间：{time}",
-    "source": "数据来源：{source}"
+    "source": "数据来源：{source}",
+    "countdownDays": "剩余 {days} 天 {hours} 小时",
+    "countdownHours": "剩余 {hours} 小时 {minutes} 分钟"
   },
   "data": {
     "demo": "演示数据 · 固定模拟值，不代表真实账号额度。",
@@ -121,5 +123,18 @@
     "private": "私有系统数据",
     "expired": "数据过期",
     "fresh": "数据正常"
+  },
+  "ui": {
+    "settings": "设备设置",
+    "close": "收起设置",
+    "subtitle": "AI 额度与主机状态，尽在这一屏。",
+    "views": "看板视图",
+    "overview": "总览",
+    "ai": "AI 监控",
+    "system": "系统监控",
+    "refresh": "刷新数据",
+    "refreshing": "刷新中",
+    "connectDevice": "连接此设备",
+    "refreshHint": "读取服务器最新数据，不会立即触发采集。"
   }
 }

@@ -9,3 +9,8 @@ export const presets = {focus:['clock','quota'], overview:['clock','quota','syst
 export function visibleWidgets(layout, shared){return (presets[layout] || presets.overview).filter(id=>!shared || registry[id].sensitivity==='public')}
 
 export function displayWidgets(layout, shared){return shared?visibleWidgets('public',true):layout==='system'?['clock','system']:layout==='quota'?['quota']:['clock','quota']}
+
+export function dashboardWidgets(layout,shared,view='overview'){
+ const ids=visibleWidgets(view==='system'&&layout!=='public'?'overview':layout,shared)
+ return view==='ai'?ids.filter(id=>['clock','quota','status'].includes(id)):view==='system'?ids.filter(id=>['clock','system','status'].includes(id)):ids
+}

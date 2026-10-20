@@ -37,7 +37,7 @@
     "offline": "Offline / Not connected",
     "cached": "Offline cache",
     "stale": "Stale data",
-    "fresh": "Fresh observation",
+    "fresh": "Data current",
     "unavailable": "Unavailable",
     "sync": "Last service sync: {time} · Polls every 30 seconds",
     "safe": "This widget contains no account quota or private content.",
@@ -61,7 +61,9 @@
     "days": "{count} day window",
     "unknownWindow": "Window duration unknown",
     "collected": "Collected: {time}",
-    "source": "Source: {source}"
+    "source": "Source: {source}",
+    "countdownDays": "{days}d {hours}h remaining",
+    "countdownHours": "{hours}h {minutes}m remaining"
   },
   "data": {
     "demo": "Demo Data · Fixed examples, not real account quotas.",
@@ -121,5 +123,18 @@
     "private": "Private system data",
     "expired": "Data expired",
     "fresh": "Data current"
+  },
+  "ui": {
+    "settings": "Device settings",
+    "close": "Close settings",
+    "subtitle": "Your AI usage and host health, in one place.",
+    "views": "Dashboard views",
+    "overview": "Overview",
+    "ai": "AI monitor",
+    "system": "System monitor",
+    "refresh": "Refresh data",
+    "refreshing": "Refreshing",
+    "connectDevice": "Connect device",
+    "refreshHint": "Reads the latest server data; does not trigger collection."
   }
 }
