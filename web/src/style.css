@@ -22,3 +22,8 @@
 .quota-widget{display:flex;flex-direction:column}.quota-widget .quota-windows{flex:1;align-content:center}.countdown{display:block;color:var(--faint)}
 
 @media(max-width:640px){input:not([type=checkbox]),select,.check-field{min-height:44px}}
+
+/* Viewport fitting is shared by all terminals. Controls stay unscaled; large
+   histories and accessibility zoom fall back to scrolling, never clipping. */
+.stage-pass{display:contents}.kiosk.display-fit{height:var(--display-height,100dvh);min-height:0}.display-fit>.display-bar,.display-fit>.display-sync,.display-fit>.notice{flex-shrink:0}.display-stage{position:relative;flex:1;min-height:120px;width:100%;overflow:hidden}.stage-content{width:100%;transform-origin:center}.kiosk .display-stage .cards{margin:0 auto;flex:none;align-content:start}.stage-scroll{overflow:auto}.display-bar{flex-wrap:wrap}.display-actions{max-width:100%;flex-wrap:wrap}.stage-content article{min-width:0}.stage-content .source-line,.stage-content .reset-line{overflow-wrap:anywhere}
+@media(orientation:landscape) and (max-height:500px){.kiosk .display-stage article{padding:14px}.kiosk .display-stage .quota-windows{margin-top:12px}.kiosk .display-stage .system-metrics{margin-top:12px}.kiosk .display-stage .collected-line{margin-top:10px}.kiosk .display-stage .system-widget>button{margin-top:10px}}

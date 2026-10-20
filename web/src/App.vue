@@ -2,6 +2,7 @@
 import {ref, computed, watch, onMounted, onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import Widget from './Widget.vue'
+import DisplayStage from './DisplayStage.vue'
 import {displayViewport} from './display-viewport.js'
 import {dashboardWidgets,displayWidgets} from './widgets.js'
 import {deviceConfig, persist, preference} from './locale-core.js'
@@ -132,7 +133,7 @@ onMounted(async()=>{
 })
 onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',wakeScreen)})
 </script>
-<template><main :class="[config.theme,{kiosk},kiosk?'display-'+displayLayout:'',!kiosk?'view-'+activeView:'']" data-ui>
+<template><main :class="[config.theme,{kiosk,'display-fit':kiosk&&!showDisplayTools},kiosk?'display-'+displayLayout:'',!kiosk?'view-'+activeView:'']" data-ui>
 <div v-if="kiosk" class="display-bar"><h1 class="brand-lockup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V3h7M14 3h7v7M21 14v7h-7M10 21H3v-7"/><path d="M8 8h8v8H8z"/></svg><span>Pixora</span><small>{{config.name}}</small></h1><div class="display-actions"><span class="wake-status" role="status">{{t('display.wake_'+wakeState)}}</span><button class="secondary" :aria-expanded="showDisplayTools" @click="showDisplayTools=!showDisplayTools">{{t('display.settings')}}</button><button class="secondary" @click="exit">{{t('config.exit')}}</button></div></div>
 <section v-if="kiosk&&showDisplayTools" class="display-tools"><label>{{t('display.layout')}}<select v-model="displayLayout" @change="saveDisplay"><option value="clock-quota">{{t('display.clockQuota')}}</option><option value="quota">{{t('display.quotaOnly')}}</option><option value="system">{{t('system.title')}}</option></select></label><button v-if="wakeState!=='active'" @click="wakeScreen">{{t('display.retryWake')}}</button><p>{{t('display.installHint')}}</p></section>
 <template v-if="!kiosk">
@@ -152,7 +153,7 @@ onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);ca
 <div v-if="!connected&&!token&&!remembered" class="notice" role="status"><p>{{t('config.connectHint')}}</p><button v-if="!kiosk" class="secondary" @click="showSettings=true">{{t('ui.connectDevice')}}</button></div>
 <p v-if="mode==='demo'" class="notice">{{t('data.demo')}}</p>
 <p v-if="error" class="notice notice-error" role="alert">{{t(error.key,error.params||{})}}</p>
-<div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" :data="data" :connected="connected" :history="systemHistory" :history-next="historyNext" :history-error="historyError" @history="loadHistory" :clock="clock"/></div>
+<DisplayStage :active="kiosk&&!showDisplayTools"><div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" :data="data" :connected="connected" :history="systemHistory" :history-next="historyNext" :history-error="historyError" @history="loadHistory" :clock="clock"/></div></DisplayStage>
 <p v-if="kiosk" class="display-sync" :class="{'offline':!connected}">{{t(connected?'status.connected':'status.offline')}} · {{t('status.sync',{time:data?new Date(data.server_time).toLocaleTimeString(locale):t('widget.notCollected')})}}</p>
 <footer v-if="!kiosk"><span>{{t('app.principle')}}</span><span>{{t('app.stage')}} · {{t('app.brand')}}</span></footer>
 </main></template>
