@@ -16,6 +16,7 @@ test('rings represent remaining quota, including zero and missing values',()=>{
 test('weather unknown values stay unknown; personal widgets hide tasks and shared weather',()=>{
  assert.equal(weatherKind(null),'unknown');assert.equal(weatherKind(0),'clear');assert.equal(weatherKind(95),'storm');assert.equal(weatherKind(999),'unknown')
  assert.equal(weatherMetric({metrics:[{key:'weather.temperature',value:null}]},'temperature'),null)
+ assert.deepEqual(displayWidgets('personal',false),['calendar','weather'])
  assert.ok(dashboardWidgets('overview',false,'personal').includes('calendar'))
  assert.ok(dashboardWidgets('overview',false,'personal').includes('weather'))
  assert.equal(dashboardWidgets('overview',false).includes('tasks'),false)
