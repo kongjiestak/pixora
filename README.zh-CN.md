@@ -1,6 +1,6 @@
 # Pixora
 
-> V0.2 开发分支：已实现数值型 Observation v2、可回滚 SQLite 迁移、Linux 主机指标与有限历史。详见 [V0.2 契约及验收](docs/V0.2.md)。尚非稳定版，部署与真机结果单独记录。
+> V0.2 开发构建：已实现数值型 Observation v2、可回滚 SQLite 迁移、Linux 主机指标与有限历史。详见 [V0.2 契约及验收](docs/V0.2.md)。尚非稳定版，部署与真机结果单独记录。
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
@@ -29,10 +29,11 @@
 | 时钟 / 额度 / 同步 Widget | 已实现，注册表、布局预设、明暗主题 |
 | 设备配置 | 仅当前浏览器本地保存名称、主题、布局、共享选项，无服务端设备管理界面 |
 | 响应式 / Kiosk | 已实现，浏览器尺寸检查；全屏和常亮按平台能力尽力调用 |
-| PWA | manifest、图标与离线公共壳已实现，手机真机安装尚未验收 |
+| PWA | manifest、图标与离线公共壳已实现，iPhone 主屏幕安装已由用户验收；Android 13 横竖屏显示已验收，安装待测 |
 | 共享隐私 | 本机过滤 + 可选服务端逐设备数据源/模式权限，见[设备指南](docs/DEVICES.md) |
 | Docker Compose | 配置已提供，实测范围见[验证报告](docs/VERIFICATION.md) |
-| 系统 / 开发者 / 完整个人信息 / 控制 / ESP32 | 除本机时钟、同步状态外均为后续规划，本轮无硬件固件或模拟器 |
+| Linux 系统监控 | 真实宿主机 CPU/内存/根磁盘、私密 Widget 与有限历史，见 [V0.2](docs/V0.2.md) |
+| 开发者 / 完整个人信息 / 控制 / ESP32 | 除本机时钟外为后续规划，本轮无硬件固件或模拟器 |
 
 ## 本机运行
 

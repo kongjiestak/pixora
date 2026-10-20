@@ -93,3 +93,36 @@ def test_retention_dedup_and_failed_migration(tmp_path):
   assert c.execute('pragma user_version').fetchone()[0]==0
   assert not c.execute("select name from sqlite_master where name='observations'").fetchall()
  assert len(list(tmp_path.glob('broken.pre-v2-*')))==1
+
+def test_multi_target_retention_pagination_and_stream_limit(tmp_path):
+ """Exercise real API pagination after per-target retention, in an isolated DB."""
+ from pixora.database import append
+ db=tmp_path/'many-targets';client=TestClient(create_app(db,READ,WRITE))
+ with sqlite3.connect(db) as c:
+  device=provision(c,'system-screen',['system'],['real'])
+  for entity in ['target-a','target-b']:
+   for age in range(1100,0,-1):append(c,Observation(**observation(age,entity)),now().isoformat())
+  assert dict(c.execute('select entity_id,count(*) from observations group by entity_id'))=={'target-a':1000,'target-b':1000}
+ latest=client.get('/api/v2/observations',headers=auth(device['token'])).json()['observations']
+ assert {x['entity_id'] for x in latest}=={'target-a','target-b'}
+ seen=set();before=None;counts={'target-a':0,'target-b':0}
+ for _ in range(10):
+  url='/api/v2/history?provider=system&limit=137'+('' if before is None else '&before='+str(before))
+  response=client.get(url,headers=auth(device['token']));assert response.status_code==200
+  page=response.json()
+  for row in page['items']:
+   assert row['id'] not in seen;seen.add(row['id']);counts[row['observation']['entity_id']]+=1
+  before=page['next_before']
+  if before is None:break
+ # Continue through all pages, including the partially filled final page.
+ while before is not None:
+  page=client.get('/api/v2/history?provider=system&limit=137&before='+str(before),headers=auth(device['token'])).json()
+  for row in page['items']:
+   assert row['id'] not in seen;seen.add(row['id']);counts[row['observation']['entity_id']]+=1
+  before=page['next_before']
+ assert counts=={'target-a':1000,'target-b':1000} and len(seen)==2000
+ for index in range(126):
+  assert client.post('/api/v2/observations',json=observation(entity=f'extra-{index}'),headers=auth(WRITE)).status_code==200
+ assert client.post('/api/v2/observations',json=observation(entity='over-cap'),headers=auth(WRITE)).status_code==429
+ assert client.post('/api/v2/observations',json=observation(entity='target-a'),headers=auth(WRITE)).status_code==200
+ assert client.get('/api/v2/history?provider=system&before=9223372036854775808',headers=auth(device['token'])).status_code==422

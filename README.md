@@ -1,6 +1,6 @@
 # Pixora
 
-> V0.2 development branch: numeric Observation v2, reversible SQLite migration, Linux host metrics and bounded history are implemented. See [V0.2 contract and acceptance](docs/V0.2.md). This is not a stable release; deployment/physical-device checks are tracked separately.
+> V0.2 development build: numeric Observation v2, reversible SQLite migration, Linux host metrics and bounded history are implemented. See [V0.2 contract and acceptance](docs/V0.2.md). This is not a stable release; deployment/physical-device checks are tracked separately.
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
@@ -29,11 +29,12 @@ Actual running build, **Demo Data only** (not account quotas):
 | Clock / quota / sync widgets | Implemented, registry, presets, dark/light themes |
 | Browser device settings | Local only; name, theme, layout, sharing; no server device-management UI |
 | Responsive display / Kiosk | Implemented; browser viewport checks; full-screen and wake lock are best effort |
-| PWA | Manifest, icons and offline public shell; physical phone installation still unverified |
+| PWA | Manifest, icons and offline public shell; iPhone Home Screen installation accepted by owner; Android 13 portrait/landscape display accepted, installation not yet tested |
 | Remembered device login | HTTPS HttpOnly cookie, expiry, logout and live device revocation; [session guide](docs/device-sessions.md) |
 | Shared display privacy | Local filter plus opt-in server provider/mode scoped tokens; [device guide](docs/DEVICES.md) |
 | Docker Compose | Provided; current validation is recorded in [verification](docs/VERIFICATION.md) |
-| System / developer / personal integrations / controls / ESP32 | Roadmap, except local clock and sync status; no hardware firmware or simulator in this revision |
+| Linux system monitoring | Real host CPU/memory/root-disk, private widget and bounded history; [V0.2](docs/V0.2.md) |
+| Developer / personal integrations / controls / ESP32 | Roadmap, except local clock; no hardware firmware or simulator in this revision |
 
 ## Run on your Mac or Linux computer
 
