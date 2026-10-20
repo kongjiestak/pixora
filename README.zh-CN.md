@@ -1,6 +1,6 @@
 # Pixora
 
-> V0.3 开发构建：GitHub 公开开发状态、RSS/Atom 与本地 JSON 待办、独立权限与私密 Widget。见 [V0.3 范围及验收](docs/V0.3.md)。日历、天气、待办编辑及稳定 Release 尚未完成。
+> V0.3 开发构建：GitHub 公开开发状态、RSS/Atom 与本地 JSON 待办、独立权限与私密 Widget。见 [V0.3 范围及验收](docs/V0.3.md)。已加入本地月历、城市天气和可切换额度圆环；日历账号同步、待办编辑及稳定 Release 尚未完成。
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
@@ -33,7 +33,7 @@
 | 共享隐私 | 本机过滤 + 可选服务端逐设备数据源/模式权限，见[设备指南](docs/DEVICES.md) |
 | Docker Compose | 配置已提供，实测范围见[验证报告](docs/VERIFICATION.md) |
 | Linux 系统监控 | 真实宿主机 CPU/内存/根磁盘、私密 Widget 与有限历史，见 [V0.2](docs/V0.2.md) |
-| 开发者 / 个人信息 | GitHub 公开状态、RSS/Atom、本地 JSON 只读待办已实现；[V0.3](docs/V0.3.md)。日历/天气/待办编辑器仍待办 |
+| 开发者 / 个人信息 | GitHub 公开状态、RSS/Atom、本地 JSON 只读待办已实现；[V0.3](docs/V0.3.md)。本地月历/城市天气已实现，日历账号同步/待办编辑仍待办 |
 | 控制 / ESP32 | 后续规划，本轮无硬件固件或模拟器 |
 
 ## 本机运行

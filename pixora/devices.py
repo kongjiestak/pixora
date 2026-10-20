@@ -24,7 +24,7 @@ def token_hash(token):
 def provision(conn, name, providers, modes, days=30):
     if not name.strip() or len(name) > 80:
         raise ValueError('name must contain 1–80 characters')
-    if not providers or not set(providers) <= {'codex', 'chatgpt', 'system', 'github', 'rss', 'tasks'}:
+    if not providers or not set(providers) <= {'codex', 'chatgpt', 'system', 'github', 'rss', 'tasks', 'weather'}:
         raise ValueError('select a supported provider')
     if not modes or not set(modes) <= {'real', 'demo'}:
         raise ValueError('select real and/or demo')
@@ -45,7 +45,7 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     create = commands.add_parser('create')
     create.add_argument('--name', required=True)
-    create.add_argument('--provider', action='append', choices=['codex', 'chatgpt', 'system', 'github', 'rss', 'tasks'], required=True)
+    create.add_argument('--provider', action='append', choices=['codex', 'chatgpt', 'system', 'github', 'rss', 'tasks', 'weather'], required=True)
     create.add_argument('--mode', action='append', choices=['demo', 'real'], default=None)
     create.add_argument('--days', type=int, default=30)
     commands.add_parser('list')

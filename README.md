@@ -1,6 +1,6 @@
 # Pixora
 
-> V0.3 development build: public GitHub activity, RSS/Atom, local JSON tasks, scoped access and private widgets. See [V0.3 scope and acceptance](docs/V0.3.md). Calendar, weather, task editing and a stable Release remain planned.
+> V0.3 development build: public GitHub activity, RSS/Atom, local JSON tasks, scoped access and private widgets. See [V0.3 scope and acceptance](docs/V0.3.md). Local month calendar, city weather and optional quota rings are implemented; account-calendar sync, task editing and a stable Release remain planned.
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
@@ -34,7 +34,7 @@ Actual running build, **Demo Data only** (not account quotas):
 | Shared display privacy | Local filter plus opt-in server provider/mode scoped tokens; [device guide](docs/DEVICES.md) |
 | Docker Compose | Provided; current validation is recorded in [verification](docs/VERIFICATION.md) |
 | Linux system monitoring | Real host CPU/memory/root-disk, private widget and bounded history; [V0.2](docs/V0.2.md) |
-| Developer / personal information | Public GitHub Actions/repository, RSS/Atom and read-only local JSON tasks; [V0.3](docs/V0.3.md). Calendar/weather/task editor remain planned |
+| Developer / personal information | Public GitHub Actions/repository, RSS/Atom and read-only local JSON tasks; [V0.3](docs/V0.3.md). Local month calendar and configured city weather implemented; task editor/account sync remain planned |
 | Controls / ESP32 | Roadmap; no hardware firmware or simulator in this revision |
 
 ## Run on your Mac or Linux computer

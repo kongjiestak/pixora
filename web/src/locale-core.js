@@ -20,6 +20,8 @@ export function deviceConfig(saved) {
     name: typeof v.name === 'string' ? v.name.slice(0, 60) : '',
     theme: ['dark', 'light'].includes(v.theme) ? v.theme : 'dark',
     layout: ['focus', 'overview', 'public'].includes(v.layout) ? v.layout : 'overview',
+    motion: v.motion !== false,
+    quotaStyle: ['rings','bars'].includes(v.quotaStyle)?v.quotaStyle:'rings',
     shared: v.shared === true
   }
 }

@@ -150,5 +150,36 @@
     "items": "本次条目",
     "pending": "待办",
     "completed": "已完成"
+  },
+  "calendar": {
+    "title": "日历",
+    "previous": "上个月",
+    "next": "下个月",
+    "today": "今天",
+    "local": "设备本地日期 · 未连接日历账号"
+  },
+  "quota": {
+    "style": "额度样式",
+    "rings": "双圆环",
+    "bars": "进度条",
+    "tightest": "较低剩余额度"
+  },
+  "motion": {
+    "enable": "轻量动效"
+  },
+  "weather": {
+    "title": "天气",
+    "model": "模型数据",
+    "empty": "无已授权天气；请配置城市并使用 weather 权限配对。",
+    "clear": "晴",
+    "cloud": "多云 / 阴",
+    "fog": "雾",
+    "snow": "雪",
+    "storm": "雷雨",
+    "rain": "雨",
+    "unknown": "未知",
+    "feels": "体感",
+    "modelTime": "模型时间",
+    "rainProbability": "降雨概率"
   }
 }

@@ -117,5 +117,30 @@ class TasksCollector:
 class InformationCollector:
  async def collect(self):
   items=[]
-  for plugin in [GitHubCollector,RSSCollector,TasksCollector]:items.extend(await plugin().collect())
+  for plugin in [GitHubCollector,RSSCollector,WeatherCollector]:items.extend(await plugin().collect())
   return items
+
+class WeatherCollector:
+ async def collect(self):
+  b=base('weather','personal','open-meteo',setting('WEATHER_ENTITY','city'))
+  lat=setting('WEATHER_LATITUDE','');lon=setting('WEATHER_LONGITUDE','')
+  if not lat or not lon:return [Observation(**b,status='unavailable')]
+  try:
+   latitude=float(lat);longitude=float(lon)
+   if not -90<=latitude<=90 or not -180<=longitude<=180:raise ValueError('invalid coordinates')
+   from datetime import datetime,timezone
+   from urllib.parse import urlencode
+   params=dict(latitude=latitude,longitude=longitude,current='temperature_2m,apparent_temperature,weather_code',daily='temperature_2m_max,temperature_2m_min,precipitation_probability_max',hourly='temperature_2m,weather_code',forecast_days=2,timezone='Asia/Shanghai',timeformat='unixtime')
+   async with asyncio.timeout(30),client() as c:data=json.loads(await read_url(c,'https://api.open-meteo.com/v1/forecast?'+urlencode(params)))
+   cur=data['current'];daily=data['daily'];hourly=data['hourly']
+   if data['current_units']['temperature_2m']!='°C' or data['hourly_units']['temperature_2m']!='°C':raise ValueError('unexpected units')
+   # Use upstream timestamps; a fresh HTTP fetch must not make an old model current.
+   epoch=cur['time'];sample=datetime.fromtimestamp(epoch,timezone.utc)
+   if sample>b['collected_at']+timedelta(minutes=5) or sample<b['collected_at']-timedelta(hours=2):raise ValueError('old or future model data')
+   metrics=[Metric(key='weather.temperature',value=cur['temperature_2m'],unit='celsius'),Metric(key='weather.feels',value=cur['apparent_temperature'],unit='celsius'),Metric(key='weather.code',value=cur['weather_code'],unit='wmo-code'),Metric(key='weather.model_time',value=epoch,unit='unix-seconds'),Metric(key='weather.high',value=daily['temperature_2m_max'][0],unit='celsius'),Metric(key='weather.low',value=daily['temperature_2m_min'][0],unit='celsius'),Metric(key='weather.rain',value=daily['precipitation_probability_max'][0],unit='percent')]
+   indices=[i for i,t in enumerate(hourly['time']) if t>epoch][:3]
+   for j,i in enumerate(indices):
+    metrics.extend([Metric(key=f'weather.hour.{j}.time',value=hourly['time'][i],unit='unix-seconds'),Metric(key=f'weather.hour.{j}.temperature',value=hourly['temperature_2m'][i],unit='celsius'),Metric(key=f'weather.hour.{j}.code',value=hourly['weather_code'][i],unit='wmo-code')])
+   if cur['temperature_2m'] is None:raise ValueError('missing current temperature')
+   return [Observation(**b,status='ok',metrics=metrics,entries=[Entry(title=setting('WEATHER_LABEL','City'),detail='Asia/Shanghai',url='https://open-meteo.com/')])]
+  except (httpx.HTTPError,OSError,TimeoutError,ValueError,KeyError,IndexError,TypeError,OverflowError):return [Observation(**b,status='error')]

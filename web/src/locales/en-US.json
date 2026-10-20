@@ -150,5 +150,36 @@
     "items": "Items in this fetch",
     "pending": "Pending",
     "completed": "Completed"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "previous": "Previous month",
+    "next": "Next month",
+    "today": "Today",
+    "local": "Device-local date · no calendar account connected"
+  },
+  "quota": {
+    "style": "Quota style",
+    "rings": "Dual rings",
+    "bars": "Progress bars",
+    "tightest": "Lower remaining"
+  },
+  "motion": {
+    "enable": "Gentle motion"
+  },
+  "weather": {
+    "title": "Weather",
+    "model": "Model data",
+    "empty": "No authorized weather. Configure a city and pair a weather-scoped device.",
+    "clear": "Clear",
+    "cloud": "Cloudy",
+    "fog": "Fog",
+    "snow": "Snow",
+    "storm": "Thunderstorm",
+    "rain": "Rain",
+    "unknown": "Unknown",
+    "feels": "Feels like",
+    "modelTime": "Model time",
+    "rainProbability": "Rain probability"
   }
 }

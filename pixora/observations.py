@@ -28,7 +28,7 @@ class Entry(BaseModel):
 class Observation(BaseModel):
     model_config = ConfigDict(extra='forbid')
     schema_version: Literal[2] = 2
-    provider: Literal['codex','chatgpt','system','github','rss','tasks']
+    provider: Literal['codex','chatgpt','system','github','rss','tasks','weather']
     connector_id: str = Field(min_length=1, max_length=64, pattern=r'^[a-z0-9][a-z0-9._-]*$')
     entity_id: str = Field(default='default', min_length=1, max_length=64, pattern=r'^[a-z0-9][a-z0-9._-]*$')
     category: Literal['ai','system','developer','personal','automation']
