@@ -1,6 +1,6 @@
 # Pixora
 
-> V0.2 development build: numeric Observation v2, reversible SQLite migration, Linux host metrics and bounded history are implemented. See [V0.2 contract and acceptance](docs/V0.2.md). This is not a stable release; deployment/physical-device checks are tracked separately.
+> V0.3 development build: public GitHub activity, RSS/Atom, local JSON tasks, scoped access and private widgets. See [V0.3 scope and acceptance](docs/V0.3.md). Calendar, weather, task editing and a stable Release remain planned.
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 

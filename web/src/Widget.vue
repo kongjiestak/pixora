@@ -1,4 +1,5 @@
 <script setup>
+import InformationWidget from './InformationWidget.vue'
 import {systemMetric,observationExpired} from './system-format.js'
 import {useI18n} from 'vue-i18n'
 import {remaining,stamp,windowLabel,isStale,compactReset,resetCountdown} from './format.js'
@@ -12,6 +13,7 @@ const source=value=>t(value==='demo'?'data.sourceDemo':value==='codex-app-server
 </script>
 <template>
 <article v-if="kind==='clock'" class="clock-widget"><span class="clock-context">{{t('widget.personal')}}</span><h2>{{clock.toLocaleTimeString(locale,{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}}</h2><p>{{clock.toLocaleDateString(locale,{weekday:'long',year:'numeric',month:'long',day:'numeric'})}}</p></article>
+<InformationWidget v-else-if="['github','rss','tasks'].includes(kind)" :provider="kind" :data="data" :clock="clock" :connected="connected"/>
 <article v-else-if="kind==='status'" class="status-widget"><span class="sync-context">{{t('widget.status')}}</span><h2>{{t(connected?'status.connected':'status.offline')}}</h2><p class="muted">{{t('status.sync',{time:date(data?.server_time)})}}</p><p>{{t('status.safe')}}</p></article>
 <article v-else-if="kind==='system'" class="system-widget">
 <div class="panel-heading"><h2>{{t('system.title')}}</h2><span class="badge">{{t('system.private')}}</span></div>

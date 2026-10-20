@@ -127,7 +127,7 @@
   "ui": {
     "settings": "Device settings",
     "close": "Close settings",
-    "subtitle": "Your AI usage and host health, in one place.",
+    "subtitle": "Usage, host health, project activity and personal information.",
     "views": "Dashboard views",
     "overview": "Overview",
     "ai": "AI monitor",
@@ -135,6 +135,20 @@
     "refresh": "Refresh data",
     "refreshing": "Refreshing",
     "connectDevice": "Connect device",
-    "refreshHint": "Reads the latest server data; does not trigger collection."
+    "refreshHint": "Reads the latest server data; does not trigger collection.",
+    "developer": "Developer",
+    "personal": "Personal"
+  },
+  "info": {
+    "github": "GitHub activity",
+    "rss": "RSS feed",
+    "tasks": "Personal tasks",
+    "private": "Private display",
+    "empty": "No authorized observations. Configure a collector and pair a scoped device.",
+    "stars": "Stars",
+    "openItems": "Open issues + PRs",
+    "items": "Items in this fetch",
+    "pending": "Pending",
+    "completed": "Completed"
   }
 }

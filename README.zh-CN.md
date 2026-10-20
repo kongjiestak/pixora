@@ -1,6 +1,6 @@
 # Pixora
 
-> V0.2 开发构建：已实现数值型 Observation v2、可回滚 SQLite 迁移、Linux 主机指标与有限历史。详见 [V0.2 契约及验收](docs/V0.2.md)。尚非稳定版，部署与真机结果单独记录。
+> V0.3 开发构建：GitHub 公开开发状态、RSS/Atom 与本地 JSON 待办、独立权限与私密 Widget。见 [V0.3 范围及验收](docs/V0.3.md)。日历、天气、待办编辑及稳定 Release 尚未完成。
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 

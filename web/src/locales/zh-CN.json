@@ -127,7 +127,7 @@
   "ui": {
     "settings": "设备设置",
     "close": "收起设置",
-    "subtitle": "AI 额度与主机状态，尽在这一屏。",
+    "subtitle": "额度、系统、开发进度与个人信息。",
     "views": "看板视图",
     "overview": "总览",
     "ai": "AI 监控",
@@ -135,6 +135,20 @@
     "refresh": "刷新数据",
     "refreshing": "刷新中",
     "connectDevice": "连接此设备",
-    "refreshHint": "读取服务器最新数据，不会立即触发采集。"
+    "refreshHint": "读取服务器最新数据，不会立即触发采集。",
+    "developer": "开发者",
+    "personal": "个人信息"
+  },
+  "info": {
+    "github": "GitHub 开发状态",
+    "rss": "RSS 订阅",
+    "tasks": "个人待办",
+    "private": "私密展示",
+    "empty": "无已授权观测；请配置连接器并单独配对。",
+    "stars": "Star",
+    "openItems": "开放 Issue 与 PR",
+    "items": "本次条目",
+    "pending": "待办",
+    "completed": "已完成"
   }
 }

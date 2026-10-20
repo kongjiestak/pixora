@@ -1,7 +1,8 @@
 """Versioned metric observations; scopes remain explicit provider capabilities."""
 from datetime import datetime, timedelta, timezone
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
+from urllib.parse import urlsplit
 from pixora.models import now
 
 class Metric(BaseModel):
@@ -10,10 +11,24 @@ class Metric(BaseModel):
     value: float | None = None
     unit: str = Field(default='', max_length=24)
 
+class Entry(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    title: str = Field(min_length=1,max_length=240)
+    detail: str = Field(default='',max_length=240)
+    url: str | None = Field(default=None,max_length=2048)
+    @field_validator('url')
+    @classmethod
+    def safe_url(cls,value):
+        if value is None:return value
+        parsed=urlsplit(value)
+        if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password or any(ord(c)<33 for c in value):
+            raise ValueError('entry link requires credential-free HTTPS')
+        return value
+
 class Observation(BaseModel):
     model_config = ConfigDict(extra='forbid')
     schema_version: Literal[2] = 2
-    provider: Literal['codex','chatgpt','system']
+    provider: Literal['codex','chatgpt','system','github','rss','tasks']
     connector_id: str = Field(min_length=1, max_length=64, pattern=r'^[a-z0-9][a-z0-9._-]*$')
     entity_id: str = Field(default='default', min_length=1, max_length=64, pattern=r'^[a-z0-9][a-z0-9._-]*$')
     category: Literal['ai','system','developer','personal','automation']
@@ -24,6 +39,8 @@ class Observation(BaseModel):
     expires_at: datetime
     sensitivity: Literal['private','public'] = 'private'
     metrics: list[Metric] = Field(default_factory=list, max_length=32)
+
+    entries: list[Entry] = Field(default_factory=list,max_length=10)
 
     @model_validator(mode='after')
     def consistent(self):
@@ -41,7 +58,7 @@ class Observation(BaseModel):
             raise ValueError('percentage outside 0..100')
         if self.status=='ok' and not any(m.value is not None for m in self.metrics):
             raise ValueError('ok requires a known metric')
-        if self.status!='ok' and self.metrics:
+        if self.status!='ok' and (self.metrics or self.entries):
             raise ValueError('failed observations cannot claim metrics')
         if len({m.key for m in self.metrics})!=len(self.metrics):
             raise ValueError('duplicate metric key')

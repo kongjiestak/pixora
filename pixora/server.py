@@ -45,7 +45,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="Pixora", version="0.2.0.dev1", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.3.0.dev1", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
@@ -102,7 +102,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         if secrets.compare_digest(token, read_token):
             if setting("ALLOW_LEGACY_READ_TOKEN", "true").lower() != "true":
                 invalid()
-            return {"providers": ["codex", "chatgpt", "system"], "modes": ["real", "demo"], "id": None}
+            return {"providers": ["codex", "chatgpt", "system", "github", "rss", "tasks"], "modes": ["real", "demo"], "id": None}
         return device_scope(token)
 
     def same_origin(request):

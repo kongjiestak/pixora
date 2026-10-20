@@ -2,13 +2,13 @@
 
 [English](ROADMAP.md) | [简体中文](ROADMAP.zh-CN.md)
 
-按验收推进，无固定日期。当前 Early Development；0.2.0.dev1 只是开发元数据，不是正式版本完成声明。
+按验收推进，无固定日期。当前 Early Development；0.3.0.dev1 只是开发元数据，不是正式版本完成声明。
 
 | 里程碑 | 工作 | 验收 / 状态 |
 |---|---|---|
 | V0.1 | Codex → API → Web、英中文、Widget、PWA/Kiosk、本机隐私 | 已部署；iPhone PWA、家庭采集恢复已验收，未创建稳定 Release |
 | V0.2 | 通用 Observation v2、迁移、PVE/主机只读指标、历史 | main 已实现：迁移回滚、Linux 系统与历史；iPhone/安卓显示已验收，PVE 专用 API 延后 |
-| V0.3 | CI/GitHub、日历/待办/天气/RSS | 规划；来源时间、隐私和真实终端矩阵 |
+| V0.3 | CI/GitHub、日历/待办/天气/RSS | 开发中：GitHub公开状态、RSS/Atom、本地待办已实现；日历/天气/编辑器待办 |
 | V0.4 | 布局编辑器、服务端设备配置、逐设备令牌/撤销 | 规划；公共设备 API 无法读到私密字段 |
 | V0.5 | 邮件摘要、生活/账单提醒、出行、预算、目标 | 规划；最小留存、撤销、屏幕锁 |
 | V0.7 | Home Assistant、自动化交互控制 | 规划；独立权限、审计、确认、幂等 |
