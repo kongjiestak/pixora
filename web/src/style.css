@@ -17,3 +17,11 @@ header h1{overflow-wrap:anywhere}.options{flex-shrink:0}header button{white-spac
 /* Explicit visual height settles standalone iOS rotation without a touch. */
 .kiosk{min-height:var(--display-height,100dvh);overflow-anchor:none}
 @media(orientation:landscape) and (max-height:600px){.kiosk{padding:max(10px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}}
+
+/* Size the clock against its own column, including after safe-area padding. */
+.kiosk .clock-widget{container-type:inline-size}
+@media(orientation:landscape) and (max-height:600px){
+ .kiosk.display-clock-quota .cards{grid-template-columns:minmax(0,.8fr) minmax(0,2fr)}
+ .kiosk .clock-widget h2{font-size:clamp(24px,4vw,46px);letter-spacing:-.5px}
+ @supports(font-size:1cqi){.kiosk .clock-widget h2{font-size:min(58px,18cqi)}}
+}
