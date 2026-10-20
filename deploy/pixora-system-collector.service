@@ -1,0 +1,33 @@
+[Unit]
+Description=Pixora read-only Linux host metrics collector
+After=network-online.target docker.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+[Service]
+Type=simple
+User=pixora-system
+Group=pixora-system
+WorkingDirectory=/var/lib/pixora-system-collector
+EnvironmentFile=/etc/pixora/system-collector.env
+ExecStart=/opt/pixora-system-collector/venv/bin/python -u -m pixora.collector --plugin system --interval 120 --max-retry-delay 300
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+MemoryMax=96M
+CPUQuota=10%
+TasksMax=32
+[Install]
+WantedBy=multi-user.target
