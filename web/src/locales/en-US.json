@@ -104,5 +104,22 @@
     "expired": "Device authorization is invalid or expired. Scan your pairing QR again.",
     "loginFailed": "Device sign-in failed. Check the connection and allow cookies for this site.",
     "logoutFailed": "Data cleared on this page, but server sign-out is incomplete. Reconnect and select Sign out this device again."
+  },
+  "system": {
+    "title": "System monitor",
+    "empty": "No authorized system observations. Requires a system-scoped device token and a Linux collector.",
+    "cpu": "CPU used",
+    "memory": "Memory used",
+    "disk": "Root disk used",
+    "source": "Source",
+    "entity": "Collection target",
+    "history": "Load history",
+    "more": "Older records",
+    "error": "History unavailable or access denied",
+    "time": "Collected",
+    "unavailable": "Unavailable",
+    "private": "Private system data",
+    "expired": "Data expired",
+    "fresh": "Data current"
   }
 }

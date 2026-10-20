@@ -1,5 +1,7 @@
 # Pixora
 
+> V0.2 开发分支：已实现数值型 Observation v2、可回滚 SQLite 迁移、Linux 主机指标与有限历史。详见 [V0.2 契约及验收](docs/V0.2.md)。尚非稳定版，部署与真机结果单独记录。
+
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
 **Make Every Screen Useful. / 让每一块屏幕都有价值。**

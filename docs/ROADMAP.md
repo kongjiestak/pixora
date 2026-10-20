@@ -20,3 +20,10 @@ NFC, MagSafe and custom PCB are separate future experiments. The legacy APM `v0.
 ## 2026-10-15 progress / 进度更新
 
 Provider/mode scoped device tokens, digest-only storage, expiry and live revocation are implemented ahead of the V0.4 milestone. Local CLI administration only; pairing UI, field-level policies and server layout synchronization remain planned. Linux Docker runtime CI passed for the previous baseline; this increment is subject to its own CI. Physical-phone/PVE acceptance remains open.
+
+
+## V0.2 development update / 开发进度
+
+Observation v2, additive migration with private backup, v1 quota backfill, Linux CPU/memory/root-disk metrics, private system Widget and bounded paginated history are implemented on the V0.2 development branch. Dedicated PVE API integration is deferred; the first connector is Linux host read-only collection. Existing device scopes remain unchanged. See [contracts and rollback](V0.2.md). Deployment and phone acceptance are separate gates; no stable V0.2 Release is claimed.
+
+V0.1 operations now include VPS HTTPS, independent home collection, verified recovery, certificate renewal and isolated SQLite restore. User iPhone installation/session/rotation/continued-display checks passed; old Android remains deferred. Earlier status rows above are historical baseline descriptions.

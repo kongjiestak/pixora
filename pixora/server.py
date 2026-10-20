@@ -6,12 +6,14 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi.responses import JSONResponse, Response
 from contextlib import asynccontextmanager, contextmanager
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import Query, FastAPI, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from pixora.models import Snapshot, now
 from pixora.settings import setting
 from pixora.devices import initialize, token_hash
+from pixora.observations import Observation, from_snapshot
+from pixora.database import migrate, append
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -25,6 +27,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     if stale < 1:
         raise RuntimeError("PIXORA_STALE_SECONDS must be positive")
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    migrate(db_path)
     @contextmanager
     def db():
         conn = sqlite3.connect(db_path, timeout=10)
@@ -42,7 +45,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="Pixora", version="0.1.0.dev1", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.2.0.dev1", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
@@ -99,7 +102,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         if secrets.compare_digest(token, read_token):
             if setting("ALLOW_LEGACY_READ_TOKEN", "true").lower() != "true":
                 invalid()
-            return {"providers": ["codex", "chatgpt"], "modes": ["real", "demo"], "id": None}
+            return {"providers": ["codex", "chatgpt", "system"], "modes": ["real", "demo"], "id": None}
         return device_scope(token)
 
     def same_origin(request):
@@ -153,6 +156,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
             if existing and Snapshot.model_validate_json(existing[0]).observed_at > snapshot.observed_at:
                 raise HTTPException(409, "older observation rejected")
             conn.execute("INSERT OR REPLACE INTO snapshots VALUES (?,?,?,?)", (snapshot.provider, snapshot.mode, body, received))
+            append(conn, from_snapshot(snapshot), received)
         return {"accepted": True, "received_at": received}
 
     @app.get("/api/v1/device")
@@ -165,6 +169,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
             rows = dict((p, (body, received)) for p, body, received in conn.execute("SELECT provider, body, received_at FROM snapshots WHERE mode=?", (mode,)))
         items = []
         for provider in scope["providers"]:
+            if provider not in ("codex", "chatgpt"): continue
             row = rows.get(provider)
             if row:
                 snap = Snapshot.model_validate_json(row[0])
@@ -177,6 +182,42 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
             else:
                 items.append(dict(provider=provider, mode=mode, source="unavailable", status="unavailable", observed_at=None, collected_at=None, received_at=None, age_seconds=None, stale=True, windows=[], reason_code="chatgpt_unavailable" if provider == "chatgpt" else "awaiting_collector", reason=None))
         return {"schema_version": 1, "server_time": now(), "stale_after_seconds": stale, "mode": mode, "device_id": scope["id"], "providers": items}
+
+    @app.post('/api/v2/observations', dependencies=[Depends(auth(write_token))])
+    def ingest_observation(observation: Observation):
+        received=now().isoformat()
+        with db() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            latest=conn.execute('SELECT collected_at FROM observations WHERE provider=? AND connector_id=? AND entity_id=? AND mode=? ORDER BY collected_at DESC LIMIT 1',
+                (observation.provider,observation.connector_id,observation.entity_id,observation.mode)).fetchone()
+            if not latest and conn.execute('SELECT COUNT(*) FROM (SELECT DISTINCT connector_id,entity_id,mode FROM observations WHERE provider=?)',(observation.provider,)).fetchone()[0]>=128:
+                raise HTTPException(429,'provider stream limit reached')
+            if latest and datetime.fromisoformat(latest[0])>observation.collected_at:
+                raise HTTPException(409,'older observation rejected')
+            append(conn,observation,received)
+        return {'accepted':True,'received_at':received}
+
+    @app.get('/api/v2/observations')
+    def latest_observations(mode: str='real',scope=Depends(read_scope)):
+        if mode not in scope['modes']:raise HTTPException(403,'device mode not permitted')
+        with db() as conn:
+            rows=conn.execute('SELECT o.provider,o.body,o.received_at FROM observations o JOIN (SELECT provider,connector_id,entity_id,mode,MAX(collected_at) latest FROM observations WHERE mode=? GROUP BY provider,connector_id,entity_id,mode) n ON o.provider=n.provider AND o.connector_id=n.connector_id AND o.entity_id=n.entity_id AND o.mode=n.mode AND o.collected_at=n.latest',(mode,)).fetchall()
+        items=[]
+        for provider,body,received in rows:
+            if provider not in scope['providers']:continue
+            item=json.loads(body);item.update(received_at=received,stale=datetime.fromisoformat(item['expires_at'])<=now())
+            items.append(item)
+        return {'schema_version':2,'server_time':now(),'observations':items}
+
+    @app.get('/api/v2/history')
+    def history(provider: str,mode: str='real',limit: int=Query(default=100,ge=1,le=500),before: int|None=Query(default=None,ge=1,le=9223372036854775807),scope=Depends(read_scope)):
+        if provider not in scope['providers'] or mode not in scope['modes']:
+            raise HTTPException(403,'device scope not permitted')
+        with db() as conn:
+            rows=conn.execute('SELECT id,body,received_at FROM observations WHERE provider=? AND mode=? AND (? IS NULL OR id<?) ORDER BY id DESC LIMIT ?',
+                (provider,mode,before,before,limit)).fetchall()
+        return {'schema_version':2,'items':[dict(id=i,observation=json.loads(body),received_at=received) for i,body,received in rows],
+            'next_before':rows[-1][0] if len(rows)==limit else None}
 
     web = Path(web_dir or setting("WEB_DIR", "web/dist"))
     if web.is_dir():

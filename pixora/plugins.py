@@ -6,9 +6,11 @@ from typing import Protocol
 from datetime import datetime, timezone, timedelta
 from pixora.models import Snapshot, Window, now
 from pixora.settings import setting
+from pixora.system_connector import SystemCollector
+from pixora.observations import Observation
 
 class Collector(Protocol):
-    async def collect(self) -> list[Snapshot]: ...
+    async def collect(self) -> list[Snapshot | Observation]: ...
 
 class CollectionError(Exception):
     pass
@@ -70,4 +72,4 @@ class DemoCollector:
     async def collect(self):
         return [Snapshot(provider=p, mode="demo", source="demo", status="ok", observed_at=now(), windows=[Window(name="demo/primary", used_percent=v, duration_minutes=300, resets_at=now()+timedelta(hours=2))], reason_code="demo_fixed") for p,v in (("codex", 36), ("chatgpt", 62))]
 
-PLUGINS: dict[str, type[Collector]] = {"codex": CodexCollector, "demo": DemoCollector}
+PLUGINS: dict[str, type[Collector]] = {"codex": CodexCollector, "demo": DemoCollector, "system": SystemCollector}

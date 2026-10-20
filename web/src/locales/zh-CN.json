@@ -104,5 +104,22 @@
     "expired": "设备授权无效或已过期，请重新扫码连接。",
     "loginFailed": "设备登录失败，请检查网络并允许本站 Cookie 后重试。",
     "logoutFailed": "本页已清除数据，但服务器退出尚未完成。请联网后点击“退出此设备”重试。"
+  },
+  "system": {
+    "title": "系统监控",
+    "empty": "此设备尚无已授权的系统观测。需要 system 范围的设备令牌和 Linux 采集器。",
+    "cpu": "CPU 使用率",
+    "memory": "内存使用率",
+    "disk": "根磁盘使用率",
+    "source": "来源",
+    "entity": "采集目标",
+    "history": "查询历史",
+    "more": "更早记录",
+    "error": "历史查询失败或权限不足",
+    "time": "采集时间",
+    "unavailable": "不可用",
+    "private": "私有系统数据",
+    "expired": "数据过期",
+    "fresh": "数据正常"
   }
 }

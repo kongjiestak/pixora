@@ -13,3 +13,6 @@ The supplied publication kit was reviewed against the existing implementation; i
 | Open source | MIT + notices, bilingual README, contribution and issue/PR templates | Community feedback |
 
 Publication policy: preserve commits and historical tags/releases, no force push. Candidate organization must not be assumed owned or available. Prefer the authorized existing account. Publish repository as Early Development until acceptance is complete; no new formal Release for this migration.
+
+
+V0.2 implementation and acceptance contract: [V0.2.md](V0.2.md). Latest status: numeric observation/history, reversible migration, Linux system connector and private system Widget implemented; deployment and device verification tracked explicitly. Existing device-scoped ACL/revocation, VPS/home deployments and iPhone installation have since passed their recorded checks; earlier table entries are historical baseline.

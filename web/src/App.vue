@@ -11,7 +11,8 @@ const config=ref(deviceConfig(preference(storage,'pixora-device',preference(stor
 const secureSession=location.protocol==='https:'
 const rememberDevice=ref(secureSession),remembered=ref(false),sessionExpiry=ref(''),authBusy=ref(false),logoutPending=ref(preference(storage,'pixora-logout-pending','')==='1')
 const token=ref(''),mode=ref('real'),data=ref(null),error=ref(null),connected=ref(false),busy=ref(false),clock=ref(new Date()),kiosk=ref(new URLSearchParams(location.search).has('kiosk'))
-const displayLayout=ref(preference(storage,'pixora-display-layout','clock-quota')==='quota'?'quota':'clock-quota'),showDisplayTools=ref(false),wakeState=ref('idle')
+const displayLayout=ref(['clock-quota','quota','system'].includes(preference(storage,'pixora-display-layout','clock-quota'))?preference(storage,'pixora-display-layout','clock-quota'):'clock-quota'),showDisplayTools=ref(false),wakeState=ref('idle')
+const systemHistory=ref([]),historyNext=ref(null),historyError=ref(false)
 const widgets=computed(()=>kiosk.value?displayWidgets(displayLayout.value,config.value.shared):visibleWidgets(config.value.layout,config.value.shared))
 function saveDisplay(){persist(storage,'pixora-display-layout',displayLayout.value)}
 let timer,tick,controller,wake,viewport,generation=0
@@ -19,7 +20,7 @@ watch(kiosk,()=>viewport?.settle(),{flush:'post'})
 function save(){persist(storage,'pixora-device',JSON.stringify(config.value))}
 function language(){persist(storage,'pixora-locale',locale.value)}
 watch(locale,()=>{document.documentElement.lang=locale.value;document.documentElement.dir='ltr'},{immediate:true})
-function cancel(){generation++;controller?.abort();busy.value=false}
+function cancel(){systemHistory.value=[];historyNext.value=null;historyError.value=false;generation++;controller?.abort();busy.value=false}
 async function load(){
  if(busy.value||authBusy.value||logoutPending.value||(!token.value&&!remembered.value)||config.value.shared)return
  const current=++generation, requestedMode=mode.value
@@ -29,12 +30,31 @@ async function load(){
    const r=await fetch('/api/v1/device?mode='+requestedMode,{credentials:'same-origin',headers:token.value?{Authorization:'Bearer '+token.value}:{},signal:requestController.signal})
    if(!r.ok)throw {status:r.status}
    const result=await r.json()
+   result.observations=[]
+   try{
+    const v2=await fetch('/api/v2/observations?mode='+requestedMode,{credentials:'same-origin',headers:token.value?{Authorization:'Bearer '+token.value}:{},signal:requestController.signal})
+    if(v2.ok)result.observations=(await v2.json()).observations
+   }catch{}
    if(current!==generation||config.value.shared)return
    data.value=result;connected.value=true;error.value=null
  }catch(e){if(current===generation){if(e.status===401){token.value='';remembered.value=false;sessionExpiry.value='';data.value=null}error.value=e.status===401?{key:'auth.expired'}:e.status?{key:'status.failure',params:{status:e.status}}:{key:'status.network'};connected.value=false}}
  finally{clearTimeout(timeout);if(current===generation)busy.value=false}
 }
 function changeMode(){cancel();data.value=null;connected.value=false;load()}
+async function loadHistory(more=false){
+ if(config.value.shared||(!token.value&&!remembered.value)||logoutPending.value)return
+ const current=generation,abort=new AbortController(),timeout=setTimeout(()=>abort.abort(),10000)
+ const before=more&&historyNext.value?'&before='+historyNext.value:''
+ try{
+  const response=await fetch('/api/v2/history?provider=system&limit=20&mode='+mode.value+before,{credentials:'same-origin',headers:token.value?{Authorization:'Bearer '+token.value}:{},signal:abort.signal})
+  if(!response.ok)throw Error('history unavailable')
+  const result=await response.json()
+  if(current!==generation||config.value.shared)return
+  systemHistory.value=more?[...systemHistory.value,...result.items].slice(-200):result.items
+  historyNext.value=result.next_before;historyError.value=false
+ }catch{if(current===generation){systemHistory.value=[];historyNext.value=null;historyError.value=true}}
+ finally{clearTimeout(timeout)}
+}
 async function sessionRequest(method, headers={}){
  const abort=new AbortController(),timeout=setTimeout(()=>abort.abort(),10000)
  try{return await fetch('/api/v1/session',{method,credentials:'same-origin',headers,signal:abort.signal})}
@@ -112,7 +132,7 @@ onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);ca
 </script>
 <template><main :class="[config.theme,{kiosk},kiosk?'display-'+displayLayout:'']">
 <div v-if="kiosk" class="display-bar"><span class="display-brand">Pixora <span>{{config.name}}</span></span><div class="display-actions"><span class="wake-status" role="status">{{t('display.wake_'+wakeState)}}</span><button class="secondary" :aria-expanded="showDisplayTools" @click="showDisplayTools=!showDisplayTools">{{t('display.settings')}}</button><button class="secondary" @click="exit">{{t('config.exit')}}</button></div></div>
-<section v-if="kiosk&&showDisplayTools" class="display-tools"><label>{{t('display.layout')}}<select v-model="displayLayout" @change="saveDisplay"><option value="clock-quota">{{t('display.clockQuota')}}</option><option value="quota">{{t('display.quotaOnly')}}</option></select></label><button v-if="wakeState!=='active'" @click="wakeScreen">{{t('display.retryWake')}}</button><p>{{t('display.installHint')}}</p></section>
+<section v-if="kiosk&&showDisplayTools" class="display-tools"><label>{{t('display.layout')}}<select v-model="displayLayout" @change="saveDisplay"><option value="clock-quota">{{t('display.clockQuota')}}</option><option value="quota">{{t('display.quotaOnly')}}</option><option value="system">{{t('system.title')}}</option></select></label><button v-if="wakeState!=='active'" @click="wakeScreen">{{t('display.retryWake')}}</button><p>{{t('display.installHint')}}</p></section>
 <header v-if="!kiosk"><div><p class="eyebrow">Pixora · {{t('app.stage')}}</p><h1>{{config.name||t('app.defaultName')}}<span>{{t('app.tagline')}}</span></h1></div><div class="options"><label>{{t('config.language')}}<select v-model="locale" @change="language"><option value="en-US" lang="en">{{t('language.english')}}</option><option value="zh-CN" lang="zh-CN">{{t('language.chinese')}}</option></select></label><button @click="kiosk?exit():display()">{{t(kiosk?'config.exit':'config.display')}}</button></div></header>
 <section v-if="!kiosk" class="connection">
 <label>{{t('config.name')}}<input v-model="config.name" maxlength="60" @change="save"></label>
@@ -128,7 +148,7 @@ onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);ca
 <p v-if="!connected&&!token&&!remembered" class="warning" role="status">{{t('config.connectHint')}}</p>
 <p v-if="mode==='demo'" class="warning">{{t('data.demo')}}</p>
 <p v-if="error" class="warning" role="alert">{{t(error.key,error.params||{})}}</p>
-<div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" :data="data" :connected="connected" :clock="clock"/></div>
+<div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" :data="data" :connected="connected" :history="systemHistory" :history-next="historyNext" :history-error="historyError" @history="loadHistory" :clock="clock"/></div>
 <p v-if="kiosk" class="display-sync" :class="{'offline':!connected}">{{t(connected?'status.connected':'status.offline')}} · {{t('status.sync',{time:data?new Date(data.server_time).toLocaleTimeString(locale):t('widget.notCollected')})}}</p>
 <footer v-if="!kiosk">{{t('app.support')}}<br>{{t('app.principle')}}<br>{{t('app.footer')}}<br>{{t('app.install')}} {{t('app.privacy')}}<br>{{t('app.brand')}}</footer>
 </main></template>

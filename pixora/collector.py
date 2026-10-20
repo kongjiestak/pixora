@@ -35,7 +35,8 @@ async def run(args):
         try:
             async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False) as client:
                 for snapshot in snapshots:
-                    response = await client.post(args.server.rstrip("/")+"/api/v1/snapshots", headers={"Authorization": "Bearer "+token}, json=snapshot.model_dump(mode="json"))
+                    endpoint="/api/v2/observations" if snapshot.schema_version==2 else "/api/v1/snapshots"
+                    response = await client.post(args.server.rstrip("/")+endpoint, headers={"Authorization": "Bearer "+token}, json=snapshot.model_dump(mode="json"))
                     response.raise_for_status()
             failures = 0
             print("snapshot delivered", flush=True)

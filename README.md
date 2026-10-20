@@ -1,5 +1,7 @@
 # Pixora
 
+> V0.2 development branch: numeric Observation v2, reversible SQLite migration, Linux host metrics and bounded history are implemented. See [V0.2 contract and acceptance](docs/V0.2.md). This is not a stable release; deployment/physical-device checks are tracked separately.
+
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
 **Make Every Screen Useful.**
