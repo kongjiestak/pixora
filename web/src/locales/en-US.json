@@ -79,7 +79,12 @@
   },
   "provider": {
     "codex": "Codex",
-    "chatgpt": "ChatGPT"
+    "chatgpt": "ChatGPT",
+    "system": "System monitoring",
+    "github": "GitHub activity",
+    "rss": "RSS feeds",
+    "weather": "Weather",
+    "tasks": "Personal tasks"
   },
   "language": {
     "english": "English",
