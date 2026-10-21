@@ -181,5 +181,16 @@
     "feels": "体感",
     "modelTime": "模型时间",
     "rainProbability": "降雨概率"
+  },
+  "orbit": {
+    "back": "返回 Orbit",
+    "manage": "管理与数据",
+    "rhythm": "30 秒网页读取节奏 · 非上游采集",
+    "presence": "让每一块屏幕都有价值。",
+    "source": "来源与更新时间",
+    "noQuota": "此设备暂无已授权的 Codex 额度",
+    "weather": "天气",
+    "motion": "动效",
+    "idle": "等待连接"
   }
 }

@@ -181,5 +181,16 @@
     "feels": "Feels like",
     "modelTime": "Model time",
     "rainProbability": "Rain probability"
+  },
+  "orbit": {
+    "back": "Back to Orbit",
+    "manage": "Manage & data",
+    "rhythm": "30 s web read cycle · not upstream collection",
+    "presence": "Make Every Screen Useful.",
+    "source": "Sources & timestamps",
+    "noQuota": "No authorized Codex quota on this device",
+    "weather": "Weather",
+    "motion": "Motion",
+    "idle": "Waiting for connection"
   }
 }
