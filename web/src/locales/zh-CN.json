@@ -231,5 +231,42 @@
     "local": "本地布局覆盖 · 服务端推荐版本 {revision}",
     "server": "使用服务端推荐 · 版本 {revision}",
     "pair": "连接设备后可编辑布局并读取服务端推荐。"
+  },
+  "themes": {
+    "title": "主题",
+    "orbit": "Orbit 深空",
+    "paper": "Paper 纸感",
+    "amoled": "AMOLED 纯黑",
+    "aurora": "Aurora 极光",
+    "orbitHint": "沉静、清晰的日常显示",
+    "paperHint": "柔和纸色，适合白天",
+    "amoledHint": "深色模式使用纯黑背景",
+    "auroraHint": "柔和渐变，可关闭动态",
+    "accent": "强调色",
+    "mint": "薄荷绿",
+    "blue": "冰蓝",
+    "amber": "琥珀",
+    "violet": "紫色",
+    "appearance": "明暗模式",
+    "themeDefault": "主题默认",
+    "auto": "跟随系统",
+    "text": "显示字号",
+    "standard": "标准",
+    "large": "大字",
+    "hint": "主题默认：Paper 使用浅色，其余使用深色。极光动态遵循动效开关和系统减少动效；实际耗电未测量。"
+  },
+  "city": {
+    "title": "天气城市",
+    "default": "默认采集城市",
+    "hint": "搜索并选择城市，不使用手机定位；不同设备可以选择不同城市。天气时间使用该城市时区，主时钟仍使用设备本机时间。",
+    "name": "城市名称",
+    "placeholder": "例如：上海、Houston、London",
+    "search": "搜索城市",
+    "searching": "搜索中",
+    "loading": "读取城市天气中",
+    "noResults": "未找到可用城市，请补充国家或地区后重试。",
+    "searchError": "城市搜索暂不可用或请求过于频繁，请稍后重试。",
+    "unavailable": "所选城市天气暂不可用",
+    "permission": "需要真实模式和 weather 读取权限才能选择城市。"
   }
 }

@@ -231,5 +231,42 @@
     "local": "Local layout override · server revision {revision}",
     "server": "Using server recommendation · revision {revision}",
     "pair": "Connect a device to edit the layout and read its server recommendation."
+  },
+  "themes": {
+    "title": "Theme",
+    "orbit": "Orbit",
+    "paper": "Paper",
+    "amoled": "AMOLED",
+    "aurora": "Aurora",
+    "orbitHint": "Quiet clarity for everyday display",
+    "paperHint": "Warm paper for daytime use",
+    "amoledHint": "Pure black in dark mode",
+    "auroraHint": "Soft gradients, optional motion",
+    "accent": "Accent color",
+    "mint": "Mint",
+    "blue": "Ice blue",
+    "amber": "Amber",
+    "violet": "Violet",
+    "appearance": "Appearance",
+    "themeDefault": "Theme default",
+    "auto": "Follow system",
+    "text": "Display text size",
+    "standard": "Standard",
+    "large": "Large",
+    "hint": "Theme default uses light Paper and dark for the other themes. Aurora respects motion and reduced-motion settings; power use has not been measured."
+  },
+  "city": {
+    "title": "Weather city",
+    "default": "Collector default",
+    "hint": "Search and select a city; device location is never read. Each screen may choose a different city. Weather uses the city time zone; the main clock still uses this device time.",
+    "name": "City name",
+    "placeholder": "For example: Shanghai, Houston, London",
+    "search": "Search cities",
+    "searching": "Searching",
+    "loading": "Reading city weather",
+    "noResults": "No available city found. Add a country or region and retry.",
+    "searchError": "City search unavailable or rate limited. Please retry later.",
+    "unavailable": "Selected city weather unavailable",
+    "permission": "Real mode and weather read permission are required to choose a city."
   }
 }

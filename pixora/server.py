@@ -14,7 +14,9 @@ from pixora.settings import setting
 from pixora.devices import initialize, token_hash
 from pixora.observations import Observation, from_snapshot
 from pixora.database import migrate, append
-from pixora.device_profiles import read_profile,allowed_providers,filter_snapshot,filter_observation,rule_for,Policy
+from pixora.device_profiles import read_profile,allowed_providers,filter_snapshot,filter_observation,rule_for,Policy,permitted_stream
+
+from pixora.weather_service import WeatherService,WeatherUnavailable,WeatherBusy
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -46,7 +48,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="Pixora", version="0.4.0.dev1", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.4.0.dev2", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
@@ -150,6 +152,36 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         response = Response(status_code=204)
         response.delete_cookie(cookie_name, path="/", secure=True, httponly=True, samesite="strict")
         return response
+
+    weather_service=WeatherService()
+    def weather_scope(scope,entity=None):
+        if 'weather' not in scope['providers'] or 'real' not in scope['modes'] or scope['policy'].public_only:
+            raise HTTPException(403,'weather scope required')
+        if entity is not None and not permitted_stream('weather','weather-readonly',entity,scope['policy']):
+            raise HTTPException(403,'weather entity not permitted')
+    @app.get('/api/v2/weather/locations')
+    async def weather_locations(name:str=Query(min_length=2,max_length=80),language:str='en',scope=Depends(read_scope)):
+        weather_scope(scope)
+        if len(name.strip())<2:raise HTTPException(422,'city name too short')
+        if language not in ('en','zh'):raise HTTPException(422,'language must be en or zh')
+        try:
+            weather_service.rate(scope['id'],'search')
+            locations=await weather_service.search(name.strip(),language)
+            allowed=[p for p in locations if permitted_stream('weather','weather-readonly','place-'+str(p['id']),scope['policy'])]
+            return {'locations':allowed}
+        except WeatherBusy:raise HTTPException(429,'weather request limit; retry later')
+        except WeatherUnavailable:raise HTTPException(502,'weather location service unavailable')
+    @app.get('/api/v2/weather/{place_id}')
+    async def city_weather(place_id:int,language:str='en',scope=Depends(read_scope)):
+        if not 1<=place_id<=2147483647 or language not in ('en','zh'):raise HTTPException(422,'invalid location or language')
+        weather_scope(scope,'place-'+str(place_id))
+        try:
+            item=filter_observation(await weather_service.weather(place_id,language,scope['id']),scope['policy'])
+            if item is None:raise HTTPException(403,'weather entity not permitted')
+            item['stale']=datetime.fromisoformat(item['expires_at'])<=now()
+            return {'schema_version':2,'observation':item}
+        except WeatherBusy:raise HTTPException(429,'weather request limit; retry later')
+        except WeatherUnavailable:raise HTTPException(502,'weather service unavailable')
 
     @app.get('/api/v2/device-config')
     def device_config(scope=Depends(read_scope)):
