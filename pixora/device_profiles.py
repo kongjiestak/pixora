@@ -17,6 +17,10 @@ class Profile(BaseModel):
     show_weather: bool = True
     density: Literal['comfortable','compact'] = 'comfortable'
     focus_window: Literal['primary','weekly'] = 'primary'
+    theme: Literal['orbit','paper','amoled','aurora'] = 'orbit'
+    accent: Literal['mint','blue','amber','violet'] = 'mint'
+    text_size: Literal['standard','large'] = 'standard'
+    appearance: Literal['theme','light','dark','auto'] = 'theme'
 
 class Rule(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)

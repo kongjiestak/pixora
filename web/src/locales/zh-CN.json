@@ -231,5 +231,28 @@
     "local": "本地布局覆盖 · 服务端推荐版本 {revision}",
     "server": "使用服务端推荐 · 版本 {revision}",
     "pair": "连接设备后可编辑布局并读取服务端推荐。"
+  },
+  "themes": {
+    "title": "主题",
+    "orbit": "Orbit 深空",
+    "paper": "Paper 纸感",
+    "amoled": "AMOLED 纯黑",
+    "aurora": "Aurora 极光",
+    "orbitHint": "沉静、清晰的日常显示",
+    "paperHint": "柔和纸色，适合白天",
+    "amoledHint": "深色模式使用纯黑背景",
+    "auroraHint": "柔和渐变，可关闭动态",
+    "accent": "强调色",
+    "mint": "薄荷绿",
+    "blue": "冰蓝",
+    "amber": "琥珀",
+    "violet": "紫色",
+    "appearance": "明暗模式",
+    "themeDefault": "主题默认",
+    "auto": "跟随系统",
+    "text": "显示字号",
+    "standard": "标准",
+    "large": "大字",
+    "hint": "主题默认：Paper 使用浅色，其余使用深色。极光动态遵循动效开关和系统减少动效；实际耗电未测量。"
   }
 }

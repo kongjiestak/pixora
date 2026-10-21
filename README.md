@@ -117,3 +117,5 @@ Settings contains Display settings, Data status and Device authorization. Langua
 ### V0.4 development / 开发中
 
 Orbit now supports a constrained local layout editor and read-only server recommendations. Administrators publish per-device entity/metric/window/entry policies through the local CLI. Existing grants do not expand. Web device administration and remote publication remain pending. See [V0.4 contract and rollback](docs/V0.4.md).
+
+The V0.4 theme increment adds Orbit, Paper, AMOLED and Aurora presets, four accents, large display text and system appearance, with live preview and per-device browser persistence. Aurora motion is optional and respects reduced motion. Existing device grants remain unchanged.

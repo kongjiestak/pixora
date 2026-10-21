@@ -1,0 +1,22 @@
+/* Theme tokens cover display, settings, controls and retained data views. */
+.pixora-themed{min-height:100vh;min-height:100dvh;background:var(--ground);color:var(--ink)}
+.pixora-themed button,.pixora-themed input,.pixora-themed select{color:var(--ink);border-color:var(--control)}
+.pixora-themed button:hover:not(:disabled){background:var(--raised)}
+.pixora-themed button:disabled{color:var(--muted);border-color:var(--line)}
+.pixora-themed :focus-visible{outline-color:var(--accent)}
+.pixora-themed .primary{background:var(--accent);color:var(--ground)}
+.pixora-themed .source-line a,.pixora-themed .saved-message{color:var(--accent)}
+.theme-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}
+.theme-option{position:relative;display:flex;align-items:flex-start;flex-direction:column;text-align:left;gap:8px;min-height:136px;background:var(--ground)!important;color:var(--ink);border:2px solid var(--control)!important;border-radius:12px;padding:16px}
+.theme-option[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:3px}
+.theme-option strong{color:var(--ink);font-size:14px}.theme-option small{color:var(--muted);font-size:12px;line-height:1.5}
+.theme-mark{position:relative;display:block;width:36px;height:36px;border:3px solid var(--accent);border-radius:50%}
+.theme-mark:after{content:"";position:absolute;inset:4px;border:2px solid var(--secondary);border-radius:50%}
+.orbit-screen{overflow:hidden}
+.pixora-themed .ring-1{--ring-color:var(--secondary)}
+.orbit-ambience{display:none;position:absolute;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(ellipse at 12% 25%,var(--glow-one),transparent 55%),radial-gradient(ellipse at 88% 75%,var(--glow-two),transparent 55%);background-size:130% 130%;background-position:0% 0%}
+.preset-aurora .orbit-ambience{display:block}
+.theme-motion.preset-aurora .orbit-ambience{will-change:transform;animation:aurora-drift 18s ease-in-out infinite alternate}
+@keyframes aurora-drift{to{transform:translate3d(2%,-2%,0) scale(1.05)}}
+@media(max-width:700px){.theme-picker{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.pixora-themed *{animation:none!important;transition:none!important}.orbit-ambience{will-change:auto!important}}

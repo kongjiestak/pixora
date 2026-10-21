@@ -134,3 +134,20 @@ def test_corrupt_policy_fails_closed_instead_of_reverting_to_full_grant(tmp_path
     for url in ['/api/v1/device','/api/v2/observations','/api/v2/history?provider=system','/api/v2/device-config']:
         response=c.get(url,headers=auth(d['token']))
         assert response.status_code==503 and 'configuration invalid' in response.text
+
+
+def test_theme_profile_compatibility_and_publication(tmp_path):
+    db,c,d=setup(tmp_path)
+    # Old four-field stored JSON still acquires the accepted theme defaults.
+    with sqlite3.connect(db) as conn:
+        configure(conn,d['id'],{'show_clock':False})
+        conn.execute('UPDATE device_profiles SET profile=? WHERE device_id=?',('{"show_clock":false,"show_weather":true,"density":"comfortable","focus_window":"primary"}',d['id']))
+    p=c.get('/api/v2/device-config',headers=auth(d['token'])).json()['profile']
+    assert p['theme']=='orbit' and p['show_clock'] is False
+    with sqlite3.connect(db) as conn:
+        configure(conn,d['id'],{'theme':'aurora','accent':'violet','appearance':'auto','text_size':'large'})
+    p=c.get('/api/v2/device-config',headers=auth(d['token'])).json()['profile']
+    assert (p['theme'],p['accent'],p['appearance'],p['text_size'])==('aurora','violet','auto','large')
+    for invalid in [{'theme':'url(evil)'},{'accent':'red'},{'appearance':'bad'},{'text_size':'huge'}]:
+        with sqlite3.connect(db) as conn,pytest.raises(ValueError):configure(conn,d['id'],invalid)
+    assert c.get('/api/v2/device-config',headers=auth(d['token'])).json()['revision']==2

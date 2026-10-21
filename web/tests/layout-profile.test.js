@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {layoutProfile,storedProfile,quotaSlots} from '../src/layout-profile.js'
+import {defaultProfile,layoutProfile,storedProfile,quotaSlots} from '../src/layout-profile.js'
 import {persist,preference} from '../src/locale-core.js'
 
 test('profile validates stored values and preserves false choices through reopen',()=>{
@@ -10,7 +10,7 @@ test('profile validates stored values and preserves false choices through reopen
  assert.deepEqual(storedProfile(preference(storage,'pixora-profile:device-a')),p)
  assert.equal(storedProfile(preference(storage,'pixora-profile:device-b')),null)
  assert.equal(storedProfile('null'),null);assert.equal(storedProfile('bad'),null)
- assert.deepEqual(layoutProfile({show_clock:'false',density:'bad'}),{show_clock:true,show_weather:true,density:'comfortable',focus_window:'primary'})
+ assert.deepEqual(layoutProfile({show_clock:'false',density:'bad'}),{...defaultProfile})
  // Reset removes only the local override, permitting new server recommendations.
  persist(storage,'pixora-profile:device-a','null')
  assert.equal(storedProfile(preference(storage,'pixora-profile:device-a')),null)

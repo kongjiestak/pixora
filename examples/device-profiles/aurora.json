@@ -1,0 +1,10 @@
+{
+  "show_clock": true,
+  "show_weather": true,
+  "density": "comfortable",
+  "focus_window": "primary",
+  "theme": "aurora",
+  "accent": "violet",
+  "text_size": "standard",
+  "appearance": "theme"
+}
