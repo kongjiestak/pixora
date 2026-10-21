@@ -11,7 +11,7 @@ export function preference(storage, key, fallback) {
   try { return storage?.getItem(key) ?? fallback } catch { return fallback }
 }
 export function persist(storage, key, value) {
-  try { storage?.setItem(key, value) } catch { /* Storage disabled: session still works. */ }
+  try { if(!storage)return false; storage.setItem(key, value); return true } catch { return false }
 }
 export function deviceConfig(saved) {
   let v; try { v = JSON.parse(saved) } catch { v = {} }

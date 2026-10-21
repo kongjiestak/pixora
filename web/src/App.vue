@@ -3,30 +3,35 @@ import {ref, computed, watch, onMounted, onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import Widget from './Widget.vue'
 import OrbitDisplay from './OrbitDisplay.vue'
-import DisplayStage from './DisplayStage.vue'
 import {displayViewport} from './display-viewport.js'
-import {dashboardWidgets,displayWidgets} from './widgets.js'
+import {dashboardWidgets} from './widgets.js'
+import {stamp,isStale} from './format.js'
+import {observationExpired} from './system-format.js'
 import {deviceConfig, persist, preference} from './locale-core.js'
 const {t,locale}=useI18n()
 let storage;try{storage=window.localStorage}catch{}
 const config=ref(deviceConfig(preference(storage,'pixora-device',preference(storage,'apm-device','{}'))))
+if(config.value.layout==='public'){config.value.shared=true;config.value.layout='overview'}
 const secureSession=location.protocol==='https:'
 const rememberDevice=ref(secureSession),remembered=ref(false),sessionExpiry=ref(''),authBusy=ref(false),logoutPending=ref(preference(storage,'pixora-logout-pending','')==='1')
 const token=ref(''),mode=ref('real'),data=ref(null),error=ref(null),connected=ref(false),busy=ref(false),clock=ref(new Date()),kiosk=ref(new URLSearchParams(location.search).has('kiosk'))
-const displayLayout=ref(['clock-quota','quota','system','developer','personal'].includes(preference(storage,'pixora-display-layout','clock-quota'))?preference(storage,'pixora-display-layout','clock-quota'):'clock-quota'),showDisplayTools=ref(false),wakeState=ref('idle')
-const management=ref(false),pollStarted=ref(Date.now())
-function manage(){management.value=true;exit();showSettings.value=true}
+const wakeState=ref('idle'),management=ref(false),pollStarted=ref(Date.now())
+function manage(){management.value=true;exit()}
 const pageVisible=ref(!document.hidden)
 function visibilityChanged(){pageVisible.value=!document.hidden;wakeScreen()}
-const activeView=ref('overview'),showSettings=ref(false)
+const activeView=ref('system')
 const systemHistory=ref([]),historyNext=ref(null),historyError=ref(false)
-const widgets=computed(()=>kiosk.value?displayWidgets(displayLayout.value,config.value.shared):dashboardWidgets(config.value.layout,config.value.shared,activeView.value))
-function refreshView(){load();if(!token.value&&!remembered.value)showSettings.value=true}
-function saveDisplay(){persist(storage,'pixora-display-layout',displayLayout.value)}
+const widgets=computed(()=>dashboardWidgets('overview',config.value.shared,activeView.value).filter(id=>!['clock','calendar','weather','status'].includes(id)))
+const diagnostic=ref(new URLSearchParams(location.search).get('debug')==='1')
+const date=value=>stamp(value,locale.value,t('widget.notCollected'))
+const dataState=item=>!connected.value?'status.cached':item.windows?(isStale(item,data.value,clock.value)?'status.stale':item.status==='ok'?'status.fresh':'status.unavailable'):(observationExpired(item,clock.value)?'status.stale':item.status==='ok'?'status.fresh':'status.unavailable')
+function refreshView(){load()}
 let timer,tick,controller,wake,viewport,generation=0
 watch(kiosk,()=>viewport?.settle(),{flush:'post'})
-function save(){persist(storage,'pixora-device',JSON.stringify(config.value))}
-function language(){persist(storage,'pixora-locale',locale.value)}
+const saved=ref(null)
+function save(){saved.value=persist(storage,'pixora-device',JSON.stringify(config.value))}
+function resetDisplay(){config.value.layout='overview';config.value.quotaStyle='rings';config.value.theme='dark';save()}
+function language(){saved.value=persist(storage,'pixora-locale',locale.value)}
 watch(locale,()=>{document.documentElement.lang=locale.value;document.documentElement.dir='ltr'},{immediate:true})
 function cancel(){systemHistory.value=[];historyNext.value=null;historyError.value=false;generation++;controller?.abort();busy.value=false}
 async function load(){
@@ -123,8 +128,8 @@ async function wakeScreen(){
   lock.addEventListener('release',()=>{if(wake===lock){wake=null;wakeState.value=kiosk.value?'released':'idle'}})
  }catch{wakeState.value=kiosk.value?'failed':'idle'}
 }
-async function exit(){kiosk.value=false;showDisplayTools.value=false;try{if(document.fullscreenElement)await document.exitFullscreen()}catch{};wake?.release();wakeState.value='idle'}
-async function display(){kiosk.value=true;showDisplayTools.value=false;try{await document.documentElement.requestFullscreen?.()}catch{};wakeScreen()}
+async function exit(){kiosk.value=false;try{if(document.fullscreenElement)await document.exitFullscreen()}catch{};wake?.release();wakeState.value='idle'}
+async function display(){kiosk.value=true;try{await document.documentElement.requestFullscreen?.()}catch{};wakeScreen()}
 onMounted(async()=>{
  viewport=displayViewport(window,()=>kiosk.value)
  wakeScreen();timer=setInterval(()=>{pollStarted.value=Date.now();load()},30000);tick=setInterval(()=>clock.value=new Date(),1000)
@@ -138,29 +143,24 @@ onMounted(async()=>{
 })
 onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',visibilityChanged)})
 </script>
-<template><OrbitDisplay v-if="!management" :data="config.shared||config.layout==='public'?null:data" :clock="clock" :connected="connected" :busy="busy" :mode="mode" :error="error" :motion="config.motion" :visible="pageVisible" :poll-started="pollStarted" :kiosk="kiosk" @manage="manage" @display="display" @exit="exit" @motion="config.motion=!config.motion;save()"/>
-<main v-else :class="[config.theme,{kiosk,motion:config.motion&&pageVisible,'display-fit':kiosk&&!showDisplayTools},kiosk?'display-'+displayLayout:'',!kiosk?'view-'+activeView:'']" data-ui>
-<div v-if="kiosk" class="display-bar"><h1 class="brand-lockup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V3h7M14 3h7v7M21 14v7h-7M10 21H3v-7"/><path d="M8 8h8v8H8z"/></svg><span>Pixora</span><small>{{config.name}}</small></h1><div class="display-actions"><span class="wake-status" role="status">{{t('display.wake_'+wakeState)}}</span><button class="secondary" :aria-expanded="showDisplayTools" @click="showDisplayTools=!showDisplayTools">{{t('display.settings')}}</button><button class="secondary" @click="exit">{{t('config.exit')}}</button></div></div>
-<section v-if="kiosk&&showDisplayTools" class="display-tools"><label>{{t('display.layout')}}<select v-model="displayLayout" @change="saveDisplay"><option value="clock-quota">{{t('display.clockQuota')}}</option><option value="quota">{{t('display.quotaOnly')}}</option><option value="system">{{t('system.title')}}</option><option value="developer">{{t('ui.developer')}}</option><option value="personal">{{t('ui.personal')}}</option></select></label><label class="check-field"><input type="checkbox" v-model="config.motion" @change="save">{{t('motion.enable')}}</label><label>{{t('quota.style')}}<select v-model="config.quotaStyle" @change="save"><option value="rings">{{t('quota.rings')}}</option><option value="bars">{{t('quota.bars')}}</option></select></label><button v-if="wakeState!=='active'" @click="wakeScreen">{{t('display.retryWake')}}</button><p>{{t('display.installHint')}}</p></section>
-<template v-if="!kiosk">
-<button class="secondary" @click="management=false">{{t('orbit.back')}}</button><header class="app-bar"><div class="brand-lockup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V3h7M14 3h7v7M21 14v7h-7M10 21H3v-7"/><path d="M8 8h8v8H8z"/></svg><span>Pixora</span><span class="build-label">0.3 · {{t('app.stage')}}</span></div><div class="header-actions"><button class="secondary" :aria-expanded="showSettings" aria-controls="device-settings" @click="showSettings=!showSettings">{{t('ui.settings')}}</button><button class="primary" @click="management=false;display()">{{t('config.display')}}</button></div></header>
-<div class="page-heading"><div><h1>{{config.name||t('app.defaultName')}}</h1><p>{{t('ui.subtitle')}}</p></div><div class="sync-summary"><span class="connection-state" :class="{online:connected}">{{t(connected?'status.connected':'status.offline')}}</span><button class="secondary refresh-action" :disabled="busy||authBusy||config.shared" :title="t('ui.refreshHint')" @click="refreshView">{{t(busy?'ui.refreshing':'ui.refresh')}}</button></div></div>
-<div class="view-toolbar"><nav :aria-label="t('ui.views')"><button v-for="view in ['overview','ai','system','developer','personal']" :key="view" :aria-pressed="activeView===view" @click="activeView=view">{{t('ui.'+view)}}</button></nav><span class="source-mode">{{t(mode==='real'?'config.real':'config.demo')}}</span></div>
-<section v-if="showSettings" id="device-settings" class="settings-panel" :aria-label="t('ui.settings')"><div class="settings-heading"><h2>{{t('ui.settings')}}</h2><button class="secondary" @click="showSettings=false">{{t('ui.close')}}</button></div><p class="muted">{{t('app.privacy')}}</p><div class="settings-fields">
-<label>{{t('config.name')}}<input v-model="config.name" maxlength="60" @change="save"></label>
-<label>{{t('config.language')}}<select v-model="locale" @change="language"><option value="en-US" lang="en">{{t('language.english')}}</option><option value="zh-CN" lang="zh-CN">{{t('language.chinese')}}</option></select></label>
-<label class="check-field"><input type="checkbox" v-model="config.motion" @change="save">{{t('motion.enable')}}</label><label>{{t('quota.style')}}<select v-model="config.quotaStyle" @change="save"><option value="rings">{{t('quota.rings')}}</option><option value="bars">{{t('quota.bars')}}</option></select></label>
-<label>{{t('config.theme')}}<select v-model="config.theme" @change="save"><option value="dark">{{t('config.dark')}}</option><option value="light">{{t('config.light')}}</option></select></label>
-<label>{{t('config.layout')}}<select v-model="config.layout" @change="save"><option value="overview">{{t('config.overview')}}</option><option value="focus">{{t('config.focus')}}</option><option value="public">{{t('config.public')}}</option></select></label>
-<label>{{t('config.data')}}<select v-model="mode" @change="changeMode"><option value="real">{{t('config.real')}}</option><option value="demo">{{t('config.demo')}}</option></select></label>
-<label class="check-field"><input type="checkbox" v-model="config.shared" @change="share">{{t('config.shared')}}</label>
-</div><div v-if="!config.shared" class="authorization-fields"><label>{{t('config.token')}}<input v-model="token" type="password" autocomplete="off" :placeholder="t('config.tokenHint')" @keyup.enter="connect"></label><label class="check-field"><input type="checkbox" v-model="rememberDevice" :disabled="authBusy||!secureSession">{{t('auth.remember')}}</label><button :disabled="busy||authBusy||(!token&&!remembered)" @click="connect">{{t('config.connect')}}</button><button class="secondary" @click="disconnect">{{t('config.disconnect')}}</button></div>
-<p v-if="remembered" class="muted" role="status">{{t('auth.remembered',{time:new Date(sessionExpiry).toLocaleString(locale)})}}</p></section>
-</template>
-<div v-if="!connected&&!token&&!remembered" class="notice" role="status"><p>{{t('config.connectHint')}}</p><button v-if="!kiosk" class="secondary" @click="showSettings=true">{{t('ui.connectDevice')}}</button></div>
-<p v-if="mode==='demo'" class="notice">{{t('data.demo')}}</p>
+<template><OrbitDisplay v-if="!management" :data="config.shared?null:data" :clock="clock" :connected="connected" :busy="busy" :mode="mode" :error="error" :motion="config.motion" :visible="pageVisible" :poll-started="pollStarted" :kiosk="kiosk" :wake-state="wakeState" @manage="manage" @display="display" @exit="exit" @motion="config.motion=!config.motion;save()"/>
+<main v-else class="dark settings-page" :class="{motion:config.motion&&pageVisible}" data-ui>
+<header class="app-bar"><div class="brand-lockup"><span>Pixora</span><small>{{t('settings.title')}}</small></div><button class="secondary" @click="management=false">{{t('orbit.back')}}</button></header>
 <p v-if="error" class="notice notice-error" role="alert">{{t(error.key,error.params||{})}}</p>
-<DisplayStage :active="kiosk&&!showDisplayTools"><div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" :quota-style="config.quotaStyle" :data="data" :connected="connected" :history="systemHistory" :history-next="historyNext" :history-error="historyError" @history="loadHistory" :clock="clock"/></div></DisplayStage>
-<p v-if="kiosk" class="display-sync" :class="{'offline':!connected}">{{t(connected?'status.connected':'status.offline')}} · {{t('status.sync',{time:data?new Date(data.server_time).toLocaleTimeString(locale):t('widget.notCollected')})}}</p>
-<footer v-if="!kiosk"><span>{{t('app.principle')}}</span><span>{{t('app.stage')}} · {{t('app.brand')}}</span></footer>
-</main></template>
+<section class="settings-section" aria-labelledby="display-heading"><h1 id="display-heading">{{t('settings.display')}}</h1><p class="muted">{{t('settings.local')}}</p><div class="settings-fields">
+<label>{{t('config.language')}}<select v-model="locale" @change="language"><option value="en-US" lang="en">{{t('language.english')}}</option><option value="zh-CN" lang="zh-CN">{{t('language.chinese')}}</option></select></label>
+<label class="check-field"><input type="checkbox" v-model="config.motion" @change="save">{{t('motion.enable')}}</label>
+<label class="check-field"><input type="checkbox" v-model="config.shared" @change="share">{{t('config.shared')}}</label>
+</div><div class="settings-actions"><button @click="management=false;display()">{{t('config.display')}}</button><span>{{t('display.wake_'+wakeState)}}</span></div><p class="muted">{{t('settings.wakeHint')}}</p><p v-if="saved!==null" role="status" class="saved-message">{{t(saved?'settings.saved':'settings.unsaved')}}</p></section>
+<section class="settings-section" aria-labelledby="data-heading"><h2 id="data-heading">{{t('settings.data')}}</h2><div class="settings-actions"><span>{{t(connected?'status.connected':'status.offline')}}</span><button class="secondary" :disabled="busy||authBusy||config.shared||(!token&&!remembered)" @click="refreshView">{{t(busy?'ui.refreshing':'ui.refresh')}}</button></div><p class="muted">{{t('orbit.rhythm')}} · {{t('status.sync',{time:date(data?.server_time)})}}</p>
+<p v-if="config.shared" class="muted">{{t('settings.privateHidden')}}</p>
+<ul v-else class="source-list"><li v-for="p in data?.providers||[]" :key="p.provider"><strong>{{t('provider.'+p.provider)}}</strong><span>{{t(dataState(p))}}</span><small>{{p.source}} · {{date(p.collected_at||p.observed_at)}}</small></li><li v-for="o in data?.observations||[]" :key="o.connector_id+'/'+o.entity_id"><strong>{{o.provider}} · {{o.entity_id}}</strong><span>{{t(dataState(o))}}</span><small>{{o.source}} · {{date(o.collected_at)}}</small></li></ul>
+<details v-if="!config.shared" class="content-details"><summary>{{t('settings.content')}}</summary><nav class="settings-actions" :aria-label="t('ui.views')"><button v-for="view in ['system','developer','personal']" :key="view" :aria-pressed="activeView===view" @click="activeView=view">{{t('ui.'+view)}}</button></nav><div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" quota-style="rings" :data="data" :connected="connected" :history="systemHistory" :history-next="historyNext" :history-error="historyError" @history="loadHistory" :clock="clock"/></div></details></section>
+<section class="settings-section" aria-labelledby="auth-heading"><h2 id="auth-heading">{{t('settings.auth')}}</h2><p v-if="remembered" role="status">{{t('auth.remembered',{time:date(sessionExpiry)})}}</p><p v-else-if="token&&connected">{{t('settings.temporary')}}</p><p v-else>{{t('settings.signedOut')}}</p><p class="muted">{{t('settings.pairHint')}}</p><button class="secondary" :disabled="authBusy||(!token&&!remembered&&!logoutPending)" @click="disconnect">{{t(logoutPending?'settings.retryLogout':'config.disconnect')}}</button>
+<details v-if="!config.shared" class="manual-pair"><summary>{{t('settings.manual')}}</summary><p class="muted">{{t('settings.tokenPrivate')}}</p><div class="authorization-fields"><label>{{t('config.token')}}<input v-model="token" type="password" autocomplete="off" :placeholder="t('config.tokenHint')" @keyup.enter="connect"></label><label class="check-field"><input type="checkbox" v-model="rememberDevice" :disabled="authBusy||!secureSession">{{t('auth.remember')}}</label><button :disabled="busy||authBusy||!token" @click="connect">{{t('config.connect')}}</button></div></details></section>
+<section v-if="diagnostic" class="settings-section"><h2>{{t('settings.diagnostics')}}</h2><p class="muted">{{t('settings.debugHint')}}</p><label>{{t('config.data')}}<select v-model="mode" @change="changeMode"><option value="real">{{t('config.real')}}</option><option value="demo">{{t('config.demo')}}</option></select></label><button class="secondary" @click="resetDisplay">{{t('settings.resetLegacy')}}</button></section>
+<p v-if="mode==='demo'" class="notice">{{t('data.demo')}}</p>
+<footer><span>{{t('app.principle')}}</span><span>{{t('app.stage')}}</span></footer></main></template>
+<style scoped>
+.settings-page{max-width:960px;margin:auto;padding:0 max(20px,env(safe-area-inset-left)) 28px}.settings-section{padding:24px 0;border-bottom:1px solid var(--line);line-height:1.7}.settings-section h1,.settings-section h2{font-size:18px;margin-bottom:12px}.settings-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0}.settings-actions button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}.source-list{list-style:none;padding:0;margin:16px 0}.source-list li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.source-list small{flex-basis:100%;overflow-wrap:anywhere}.content-details,.manual-pair{margin-top:20px}.settings-page summary{cursor:pointer;min-height:44px;padding:10px 0}.saved-message{color:var(--accent);font-size:13px}.settings-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.manual-pair .authorization-fields{border-top:0;margin-top:0}.settings-section>button{margin-top:12px}@media(max-width:600px){.settings-fields{grid-template-columns:1fr}.settings-section{padding:20px 0}}
+</style>
