@@ -1,13 +1,13 @@
 # Pixora
 
-> V0.3 development build: public GitHub activity, RSS/Atom, local JSON tasks, scoped access and private widgets. See [V0.3 scope and acceptance](docs/V0.3.md). Local month calendar, city weather and optional quota rings are implemented; account-calendar sync, task editing and a stable Release remain planned.
+> V0.4 development build: Orbit themes, selectable weather cities, separate administrator device console, pairing/revocation and batch layout publication. See [V0.4](docs/V0.4.md) and the [administrator guide](docs/ADMIN.md). Early Development; no stable Release.
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
 **Make Every Screen Useful.**
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-**Early Development — not an accepted V0.1 release.** Pixora is a working brand, not a cleared trademark. This repository continues AI Pocket Monitor (APM); its commits and historical release are retained. No new Pixora Release is claimed.
+**Early Development — not a stable release.** Pixora is a working brand, not a cleared trademark. This repository continues AI Pocket Monitor (APM); its commits and historical release are retained. No new Pixora Release is claimed.
 
 An open-source, self-hostable platform that turns everyday screens into personalized information hubs. Software comes first: no dedicated hardware, purchased VPS, or mandatory cloud service is required. Live Codex data depends on your own Codex sign-in and its upstream service.
 
@@ -27,11 +27,11 @@ Actual running build, **Demo Data only** (not account quotas):
 | ChatGPT personal subscription quota | Unavailable; no stable public personal-quota API is integrated; never estimated |
 | English / Simplified Chinese | Vue I18n, detection, switch, fallback, preference storage, Intl formatting |
 | Clock / quota / sync widgets | Implemented, registry, presets, dark/light themes |
-| Browser device settings | Local only; name, theme, layout, sharing; no server device-management UI |
+| Device settings | Local display overrides + server recommendations; separate administrator inventory, pairing, revocation and batch layouts; [guide](docs/ADMIN.md) |
 | Responsive display / Kiosk | Implemented; browser viewport checks; full-screen and wake lock are best effort |
 | PWA | Manifest, icons and offline public shell; iPhone Home Screen installation accepted by owner; Android 13 portrait/landscape display accepted, installation not yet tested |
 | Remembered device login | HTTPS HttpOnly cookie, expiry, logout and live device revocation; [session guide](docs/device-sessions.md) |
-| Shared display privacy | Local filter plus opt-in server provider/mode scoped tokens; [device guide](docs/DEVICES.md) |
+| Screen privacy | Server provider/mode scopes and restrictive policies; sign-out clears this page; [device guide](docs/DEVICES.md) |
 | Docker Compose | Provided; current validation is recorded in [verification](docs/VERIFICATION.md) |
 | Linux system monitoring | Real host CPU/memory/root-disk, private widget and bounded history; [V0.2](docs/V0.2.md) |
 | Developer / personal information | Public GitHub Actions/repository, RSS/Atom and read-only local JSON tasks; [V0.3](docs/V0.3.md). Local month calendar and configured city weather implemented; task editor/account sync remain planned |

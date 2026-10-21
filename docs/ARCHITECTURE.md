@@ -21,7 +21,7 @@ flowchart LR
 - Snapshot v1: `provider`, `source`, `mode`, `status`, `observed_at` (ingest alias `collected_at`), `windows`, optional `reason_code`. API returns both timestamp names plus receipt time, age and stale. Quota schema intentionally limits providers; it is not a universal metrics schema.
 - Widget registry: `{titleKey, mode, sensitivity}`. Vue widget inputs `{data, clock, connected}`; display logic uses locale keys and raw structured fields. UTC storage, local-zone Intl presentation. `public` widgets can display without quota credentials; sharing clears token and pending requests.
 - SQLite retains v1 latest provider/mode snapshots plus bounded v2 metric history (1,000 records/stream). Additive migration makes a private pre-v2 backup and backfills current snapshots. Transactions reject older replayed observations; connections close after each operation. Single trust domain and separate read/write token capabilities.
-- Three layouts, light/dark themes and device configuration are browser-local. No server-managed device registry or drag/drop editor.
+- Orbit themes/layouts support browser-local overrides and administrator-published server recommendations. The device registry and separate administrator console support pairing, revocation and batch profile publication. No arbitrary drag/drop editor.
 - PWA precaches public shell and built assets. No API/token/observation persistence. HTTPS scoped devices may restore a Secure HttpOnly session; manual localhost tokens remain in memory. HTTPS/localhost required. Screen wake and full-screen are browser-dependent.
 
 ## Future contracts and boundaries
@@ -39,3 +39,6 @@ V0.3 adds optional bounded plain-text entries to Observation v2, independent git
 ## V0.4 device profiles / 设备配置
 
 Devices read `/api/v2/device-config`; the local administrator CLI publishes recommended profiles and restrictive policies. An additive SQLite device_profiles table preserves existing grants by default. Entity/connector/metric/window/entry projections are enforced by v1/v2/history APIs for both Bearer and existing Cookie sessions. The Orbit editor saves local overrides and can restore server recommendations, without granting data permissions. See [V0.4 contracts and privacy-sensitive rollback](V0.4.md).
+
+
+V0.4 dev3 adds independent hashed administrator keys, eight-hour HTTPS sessions, bounded audit and revision-checked device management routes. Display and collector credentials never grant administrator capability. See [ADMIN.md](ADMIN.md).

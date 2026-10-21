@@ -31,3 +31,8 @@ V0.1 operations now include VPS HTTPS, independent home collection, verified rec
 ## V0.4 first increment / 首轮增量
 
 See [device profiles, restrictive policies and rollback boundary](V0.4.md). V0.3 Orbit/settings were accepted on iPhone; V0.4 has its own acceptance gate. No stable Release is claimed.
+
+
+## V0.4 dev3 update / 更新
+
+Implemented: administrator-only web device inventory, per-device pairing/revocation, restrictive policy editing and atomic batch profile publication. Local overrides keep precedence; arbitrary widget composition, online presence and one-use invitations remain future work. See [administrator guide](ADMIN.md) / [管理员指南](ADMIN.zh-CN.md). Deployment and owner acceptance are separate from automated checks. Package version 0.4.0.dev3 remains Early Development.

@@ -44,3 +44,12 @@ The beta browser rendered real system metrics and two history rows, with no hori
 ## V0.2 Taste-Skill UI redesign
 
 Applied the upstream app-screen workflow using True-black flat, seed 1899116366, with retained Pixora data hue/system fonts. [Design provenance and critique](design/UI-DIRECTION.md) records the source commit and check substitution. Fifteen frontend tests and production build passed; upstream static lint returned 0 FAIL/0 WARN. CUA browser checks covered 1440/768/390px, EN/ZH, dark/light, real metrics, history, shared-mode clearing and 956×440 display layout. Device and token scope logic was preserved; no schema/backend change in this UI increment. Physical phone approval remains pending. Production is not automatically upgraded by this design preview.
+
+
+## V0.4 dev3 administrator console (2026-10-21)
+
+- 92 Python tests and 31 frontend tests passed, production Vite build passed; npm reported zero known dependency vulnerabilities at install time. Staged/full-history secret and commit-email audit passed. GitHub CI includes a clean container build/runtime check.
+- VPS rollout: additive administrator tables; SQLite backup/current integrity checks passed and all nine original device rows were identical after migration. Existing read scopes were preserved.
+- Live isolated QA: two temporary devices, dedicated administrator login, display Cookie, batch publication, stale-revision 409, policy narrowing, denied grant expansion, revocation 401 for Bearer and Cookie, token-free inventory/audit. Both temporary devices were revoked afterward.
+- Browser console: actual HTTPS sign-in, filtering, source/form/layout controls and stored server profile loading checked. Narrow portrait overflow checked independently of physical phones. Administrator screen pairing scan on a real phone remains owner acceptance; it is not inferred from API/desktop tests.
+- Existing owner confirmation covers themes and city switching; no stable Release is created.
