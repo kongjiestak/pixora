@@ -213,5 +213,23 @@
     "debugHint": "仅用于管理员排查；演示模式不代表真实账号数据。",
     "resetLegacy": "重置旧版显示偏好",
     "unsaved": "当前浏览器无法保存偏好；本次修改有效，重开后可能恢复默认。"
+  },
+  "layout": {
+    "title": "Orbit 布局",
+    "hint": "修改后自动保存到当前浏览器，可立即返回预览；布局设置不增加数据权限。",
+    "clock": "显示时钟",
+    "weather": "显示当天天气",
+    "focus": "圆环中心主窗口",
+    "primary": "5 小时额度",
+    "weekly": "7 天额度",
+    "density": "显示密度",
+    "comfortable": "舒展",
+    "compact": "紧凑",
+    "preview": "返回预览",
+    "reset": "恢复服务端推荐",
+    "export": "导出布局 JSON",
+    "local": "本地布局覆盖 · 服务端推荐版本 {revision}",
+    "server": "使用服务端推荐 · 版本 {revision}",
+    "pair": "连接设备后可编辑布局并读取服务端推荐。"
   }
 }

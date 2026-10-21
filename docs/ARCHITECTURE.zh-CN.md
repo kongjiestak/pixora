@@ -17,3 +17,7 @@ PWA 只缓存公共壳与资源，不缓存 API、令牌或观测，HTTPS 独立
 服务端逐设备来源/模式权限、期限和撤销已实现；字段权限与公共数据裁剪仍待实现。Mac 可独立运行；PVE Linux VM 可常驻服务，Mac 休眠则采集过期，VPS 可选。多尺寸 ESP32、NFC、MagSafe、自研 PCB 后续探索。
 
 V0.3 adds optional bounded plain-text entries to Observation v2, independent github/rss/tasks scopes, and read-only configured collectors. SQLite remains v2; old device grants do not expand. See [V0.3 implementation, limits and acceptance](V0.3.md). Calendar/weather/editor remain future tasks.
+
+## V0.4 device profiles / 设备配置
+
+设备端新增只读 `/api/v2/device-config`，管理员本地 CLI 发布推荐布局和收紧策略。SQLite 新增独立 device_profiles 表，旧令牌默认保持原范围；实体/连接器/指标/额度窗口及条目投影在 v1/v2/历史 API 服务端过滤，并对已存在 Cookie 会话即时生效。浏览器 Orbit 编辑器仅保存本地布局覆盖，可恢复服务端推荐；不增加数据权限。详细契约与回退隐私边界见 [V0.4](V0.4.md)。

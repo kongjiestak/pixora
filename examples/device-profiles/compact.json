@@ -1,0 +1,6 @@
+{
+  "show_clock": true,
+  "show_weather": true,
+  "density": "compact",
+  "focus_window": "primary"
+}

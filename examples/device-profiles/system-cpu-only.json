@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "system": {
+      "connectors": ["linux-host"],
+      "entities": ["us-vps-host"],
+      "metrics": ["cpu.used"],
+      "entries": "none"
+    }
+  },
+  "public_only": false
+}
