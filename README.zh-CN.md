@@ -1,13 +1,13 @@
 # Pixora
 
-> V0.3 开发构建：GitHub 公开开发状态、RSS/Atom 与本地 JSON 待办、独立权限与私密 Widget。见 [V0.3 范围及验收](docs/V0.3.md)。已加入本地月历、城市天气和可切换额度圆环；日历账号同步、待办编辑及稳定 Release 尚未完成。
+> V0.4 开发构建：Orbit 多主题、可切换天气城市、独立管理员设备管理、配对与撤销、批量布局发布。见 [V0.4](docs/V0.4.zh-CN.md) 与 [管理指南](docs/ADMIN.zh-CN.md)。仍为 Early Development，未发布稳定版。
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
 
 **Make Every Screen Useful. / 让每一块屏幕都有价值。**
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-**Early Development（早期开发），尚未完成 V0.1 全部验收。** Pixora 当前是未经商标审查的工作品牌。本项目延续 AI Pocket Monitor（APM），保留原提交与历史 Release，本轮不宣称新 Pixora 正式版完成。
+**Early Development（早期开发），不是稳定版本。** Pixora 当前是未经商标审查的工作品牌。本项目延续 AI Pocket Monitor（APM），保留原提交与历史 Release，本轮不宣称新 Pixora 正式版完成。
 
 一个开源、可自托管、支持多语言与多设备的个人信息展示及交互平台。软件优先，让闲置手机、平板和电脑成为信息终端；未来再适配 ESP32。不需要购买专用硬件或 VPS，不强制使用云服务。Codex 真实数据仍依赖用户自己的登录和上游服务。
 
@@ -27,10 +27,10 @@
 | ChatGPT 个人订阅额度 | 未接入稳定公开额度 API，始终不可用，不推算、不伪造 |
 | 英语 / 简体中文 | Vue I18n，检测、切换、回退、偏好存储，Intl 格式化 |
 | 时钟 / 额度 / 同步 Widget | 已实现，注册表、布局预设、明暗主题 |
-| 设备配置 | 仅当前浏览器本地保存名称、主题、布局、共享选项，无服务端设备管理界面 |
+| 设备配置 | 浏览器本地布局覆盖 + 服务端推荐；独立管理员设备清单、配对、撤销和批量布局发布，见[管理指南](docs/ADMIN.zh-CN.md) |
 | 响应式 / Kiosk | 已实现，浏览器尺寸检查；全屏和常亮按平台能力尽力调用 |
 | PWA | manifest、图标与离线公共壳已实现，iPhone 主屏幕安装已由用户验收；Android 13 横竖屏显示已验收，安装待测 |
-| 共享隐私 | 本机过滤 + 可选服务端逐设备数据源/模式权限，见[设备指南](docs/DEVICES.md) |
+| 屏幕隐私 | 服务端逐设备数据源/模式及限制策略；退出登录清除本页数据，见[设备指南](docs/DEVICES.md) |
 | Docker Compose | 配置已提供，实测范围见[验证报告](docs/VERIFICATION.md) |
 | Linux 系统监控 | 真实宿主机 CPU/内存/根磁盘、私密 Widget 与有限历史，见 [V0.2](docs/V0.2.md) |
 | 开发者 / 个人信息 | GitHub 公开状态、RSS/Atom、本地 JSON 只读待办已实现；[V0.3](docs/V0.3.md)。本地月历/城市天气已实现，日历账号同步/待办编辑仍待办 |

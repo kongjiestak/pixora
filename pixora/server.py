@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pixora.models import Snapshot, now
 from pixora.settings import setting
 from pixora.devices import initialize, token_hash
+from pixora import admin
 from pixora.observations import Observation, from_snapshot
 from pixora.database import migrate, append
 from pixora.device_profiles import read_profile,allowed_providers,filter_snapshot,filter_observation,rule_for,Policy,permitted_stream
@@ -42,13 +43,14 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
             conn.close()
     with db() as conn:
         initialize(conn)
+        admin.initialize(conn)
         conn.execute("CREATE TABLE IF NOT EXISTS device_sessions(token_hash TEXT PRIMARY KEY, device_id TEXT NOT NULL, expires_at TEXT NOT NULL)")
         conn.execute("CREATE TABLE IF NOT EXISTS snapshots(provider TEXT, mode TEXT, body TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY(provider,mode))")
 
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="Pixora", version="0.4.0.dev2", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.4.0.dev3", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
@@ -120,6 +122,8 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         # Browser mutations require an explicit, exact HTTPS Origin. Do not trust forwarded headers.
         if request.headers.get("origin") != "https://" + request.headers.get("host", ""):
             raise HTTPException(403, "same-origin HTTPS required")
+
+    admin.install_routes(app,db,same_origin,bearer)
 
     @app.post("/api/v1/session")
     def login(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):

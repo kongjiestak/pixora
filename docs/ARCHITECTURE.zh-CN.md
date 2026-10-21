@@ -21,3 +21,6 @@ V0.3 adds optional bounded plain-text entries to Observation v2, independent git
 ## V0.4 device profiles / 设备配置
 
 设备端新增只读 `/api/v2/device-config`，管理员本地 CLI 发布推荐布局和收紧策略。SQLite 新增独立 device_profiles 表，旧令牌默认保持原范围；实体/连接器/指标/额度窗口及条目投影在 v1/v2/历史 API 服务端过滤，并对已存在 Cookie 会话即时生效。浏览器 Orbit 编辑器仅保存本地布局覆盖，可恢复服务端推荐；不增加数据权限。详细契约与回退隐私边界见 [V0.4](V0.4.md)。
+
+
+V0.4 dev3 新增独立管理员密钥/8 小时 HTTPS 会话、有限操作记录与版本检查的设备管理接口。显示和采集凭据不能管理设备。可批量发布布局，手机本地覆盖仍优先；见[管理指南](ADMIN.zh-CN.md)。
