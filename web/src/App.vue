@@ -8,6 +8,7 @@ import {dashboardWidgets} from './widgets.js'
 import {stamp,isStale} from './format.js'
 import {observationExpired} from './system-format.js'
 import {deviceConfig, persist, preference} from './locale-core.js'
+import {defaultProfile,layoutProfile,storedProfile} from './layout-profile.js'
 const {t,locale}=useI18n()
 let storage;try{storage=window.localStorage}catch{}
 const config=ref(deviceConfig(preference(storage,'pixora-device',preference(storage,'apm-device','{}'))))
@@ -20,6 +21,29 @@ function manage(){management.value=true;exit()}
 const pageVisible=ref(!document.hidden)
 function visibilityChanged(){pageVisible.value=!document.hidden;wakeScreen()}
 const activeView=ref('system')
+const profile=ref({...defaultProfile}),deviceProfile=ref(null),localProfile=ref(false)
+function saveLayout(){
+ if(!deviceProfile.value||config.value.shared)return
+ localProfile.value=true;saved.value=persist(storage,'pixora-profile:'+deviceProfile.value.device_id,JSON.stringify(profile.value))
+ viewport?.settle()
+}
+function resetLayout(){
+ if(!deviceProfile.value)return
+ profile.value=layoutProfile(deviceProfile.value.profile);localProfile.value=false
+ saved.value=persist(storage,'pixora-profile:'+deviceProfile.value.device_id,'null');viewport?.settle()
+}
+function exportLayout(){
+ const url=URL.createObjectURL(new Blob([JSON.stringify(profile.value,null,2)],{type:'application/json'}))
+ const a=document.createElement('a');a.href=url;a.download='pixora-layout.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+}
+function applyProfile(remote){
+ if(remote?.device_id!==deviceProfile.value?.device_id){
+  const local=storedProfile(preference(storage,'pixora-profile:'+remote?.device_id,'null'))
+  localProfile.value=!!local;profile.value=local||layoutProfile(remote?.profile)
+ }else if(!localProfile.value)profile.value=layoutProfile(remote?.profile)
+ deviceProfile.value=remote
+}
+
 const systemHistory=ref([]),historyNext=ref(null),historyError=ref(false)
 const widgets=computed(()=>dashboardWidgets('overview',config.value.shared,activeView.value).filter(id=>!['clock','calendar','weather','status'].includes(id)))
 const diagnostic=ref(new URLSearchParams(location.search).get('debug')==='1')
@@ -43,14 +67,18 @@ async function load(){
    const r=await fetch('/api/v1/device?mode='+requestedMode,{credentials:'same-origin',headers:token.value?{Authorization:'Bearer '+token.value}:{},signal:requestController.signal})
    if(!r.ok)throw {status:r.status}
    const result=await r.json()
+   const cfg=await fetch('/api/v2/device-config',{credentials:'same-origin',headers:token.value?{Authorization:'Bearer '+token.value}:{},signal:requestController.signal})
+   if(!cfg.ok&&cfg.status!==403)throw {status:cfg.status}
+   const remote=cfg.ok?await cfg.json():null
+   if(remote&&remote.device_id!==result.device_id)throw {status:409}
    result.observations=[]
    try{
     const v2=await fetch('/api/v2/observations?mode='+requestedMode,{credentials:'same-origin',headers:token.value?{Authorization:'Bearer '+token.value}:{},signal:requestController.signal})
     if(v2.ok)result.observations=(await v2.json()).observations
    }catch{}
    if(current!==generation||config.value.shared)return
-   data.value=result;connected.value=true;error.value=null
- }catch(e){if(current===generation){if(e.status===401){token.value='';remembered.value=false;sessionExpiry.value='';data.value=null}error.value=e.status===401?{key:'auth.expired'}:e.status?{key:'status.failure',params:{status:e.status}}:{key:'status.network'};connected.value=false}}
+   applyProfile(remote);data.value=result;connected.value=true;error.value=null
+ }catch(e){if(current===generation){if(e.status===401){token.value='';remembered.value=false;sessionExpiry.value='';data.value=null;deviceProfile.value=null;profile.value={...defaultProfile};localProfile.value=false}error.value=e.status===401?{key:'auth.expired'}:e.status?{key:'status.failure',params:{status:e.status}}:{key:'status.network'};connected.value=false}}
  finally{clearTimeout(timeout);if(current===generation)busy.value=false}
 }
 function changeMode(){cancel();data.value=null;connected.value=false;load()}
@@ -84,7 +112,7 @@ async function clearRemoteSession(){
 async function connect(){
  if(authBusy.value||config.value.shared)return
  if(!token.value){load();return}
- cancel();const current=generation;error.value=null;data.value=null;connected.value=false
+ cancel();const current=generation;error.value=null;data.value=null;deviceProfile.value=null;profile.value={...defaultProfile};localProfile.value=false;connected.value=false
  if(!rememberDevice.value){load();return}
  authBusy.value=true
  try{
@@ -99,7 +127,7 @@ async function connect(){
  if(current===generation&&remembered.value)load()
 }
 async function disconnect(){
- cancel();token.value='';data.value=null;connected.value=false;remembered.value=false;sessionExpiry.value='';error.value=null
+ cancel();token.value='';data.value=null;deviceProfile.value=null;profile.value={...defaultProfile};localProfile.value=false;connected.value=false;remembered.value=false;sessionExpiry.value='';error.value=null
  try{await clearRemoteSession()}catch{error.value={key:'auth.logoutFailed'}}
 }
 async function restoreSession(){
@@ -143,7 +171,7 @@ onMounted(async()=>{
 })
 onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',visibilityChanged)})
 </script>
-<template><OrbitDisplay v-if="!management" :data="config.shared?null:data" :clock="clock" :connected="connected" :busy="busy" :mode="mode" :error="error" :motion="config.motion" :visible="pageVisible" :poll-started="pollStarted" :kiosk="kiosk" :wake-state="wakeState" @manage="manage" @display="display" @exit="exit" @motion="config.motion=!config.motion;save()"/>
+<template><OrbitDisplay v-if="!management" :data="config.shared?null:data" :profile="profile" :clock="clock" :connected="connected" :busy="busy" :mode="mode" :error="error" :motion="config.motion" :visible="pageVisible" :poll-started="pollStarted" :kiosk="kiosk" :wake-state="wakeState" @manage="manage" @display="display" @exit="exit" @motion="config.motion=!config.motion;save()"/>
 <main v-else class="dark settings-page" :class="{motion:config.motion&&pageVisible}" data-ui>
 <header class="app-bar"><div class="brand-lockup"><span>Pixora</span><small>{{t('settings.title')}}</small></div><button class="secondary" @click="management=false">{{t('orbit.back')}}</button></header>
 <p v-if="error" class="notice notice-error" role="alert">{{t(error.key,error.params||{})}}</p>
@@ -151,7 +179,7 @@ onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);ca
 <label>{{t('config.language')}}<select v-model="locale" @change="language"><option value="en-US" lang="en">{{t('language.english')}}</option><option value="zh-CN" lang="zh-CN">{{t('language.chinese')}}</option></select></label>
 <label class="check-field"><input type="checkbox" v-model="config.motion" @change="save">{{t('motion.enable')}}</label>
 <label class="check-field"><input type="checkbox" v-model="config.shared" @change="share">{{t('config.shared')}}</label>
-</div><div class="settings-actions"><button @click="management=false;display()">{{t('config.display')}}</button><span>{{t('display.wake_'+wakeState)}}</span></div><p class="muted">{{t('settings.wakeHint')}}</p><p v-if="saved!==null" role="status" class="saved-message">{{t(saved?'settings.saved':'settings.unsaved')}}</p></section>
+</div><fieldset class="layout-editor" :disabled="!deviceProfile||config.shared"><legend>{{t('layout.title')}}</legend><p class="muted">{{t('layout.hint')}}</p><div class="settings-fields"><label class="check-field"><input type="checkbox" v-model="profile.show_clock" @change="saveLayout">{{t('layout.clock')}}</label><label class="check-field"><input type="checkbox" v-model="profile.show_weather" @change="saveLayout">{{t('layout.weather')}}</label><label>{{t('layout.focus')}}<select v-model="profile.focus_window" @change="saveLayout"><option value="primary">{{t('layout.primary')}}</option><option value="weekly">{{t('layout.weekly')}}</option></select></label><label>{{t('layout.density')}}<select v-model="profile.density" @change="saveLayout"><option value="comfortable">{{t('layout.comfortable')}}</option><option value="compact">{{t('layout.compact')}}</option></select></label></div><div class="settings-actions"><button class="secondary" @click="management=false">{{t('layout.preview')}}</button><button class="secondary" @click="resetLayout">{{t('layout.reset')}}</button><button class="secondary" @click="exportLayout">{{t('layout.export')}}</button></div></fieldset><p class="muted" v-if="deviceProfile">{{t(localProfile?'layout.local':'layout.server',{revision:deviceProfile.revision})}} · {{deviceProfile.name}}</p><p class="muted" v-else>{{t('layout.pair')}}</p><div class="settings-actions"><button @click="management=false;display()">{{t('config.display')}}</button><span>{{t('display.wake_'+wakeState)}}</span></div><p class="muted">{{t('settings.wakeHint')}}</p><p v-if="saved!==null" role="status" class="saved-message">{{t(saved?'settings.saved':'settings.unsaved')}}</p></section>
 <section class="settings-section" aria-labelledby="data-heading"><h2 id="data-heading">{{t('settings.data')}}</h2><div class="settings-actions"><span>{{t(connected?'status.connected':'status.offline')}}</span><button class="secondary" :disabled="busy||authBusy||config.shared||(!token&&!remembered)" @click="refreshView">{{t(busy?'ui.refreshing':'ui.refresh')}}</button></div><p class="muted">{{t('orbit.rhythm')}} · {{t('status.sync',{time:date(data?.server_time)})}}</p>
 <p v-if="config.shared" class="muted">{{t('settings.privateHidden')}}</p>
 <ul v-else class="source-list"><li v-for="p in data?.providers||[]" :key="p.provider"><strong>{{t('provider.'+p.provider)}}</strong><span>{{t(dataState(p))}}</span><small>{{p.source}} · {{date(p.collected_at||p.observed_at)}}</small></li><li v-for="o in data?.observations||[]" :key="o.connector_id+'/'+o.entity_id"><strong>{{o.provider}} · {{o.entity_id}}</strong><span>{{t(dataState(o))}}</span><small>{{o.source}} · {{date(o.collected_at)}}</small></li></ul>
@@ -162,5 +190,5 @@ onUnmounted(()=>{viewport?.dispose();clearInterval(timer);clearInterval(tick);ca
 <p v-if="mode==='demo'" class="notice">{{t('data.demo')}}</p>
 <footer><span>{{t('app.principle')}}</span><span>{{t('app.stage')}}</span></footer></main></template>
 <style scoped>
-.settings-page{max-width:960px;margin:auto;padding:0 max(20px,env(safe-area-inset-left)) 28px}.settings-section{padding:24px 0;border-bottom:1px solid var(--line);line-height:1.7}.settings-section h1,.settings-section h2{font-size:18px;margin-bottom:12px}.settings-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0}.settings-actions button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}.source-list{list-style:none;padding:0;margin:16px 0}.source-list li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.source-list small{flex-basis:100%;overflow-wrap:anywhere}.content-details,.manual-pair{margin-top:20px}.settings-page summary{cursor:pointer;min-height:44px;padding:10px 0}.saved-message{color:var(--accent);font-size:13px}.settings-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.manual-pair .authorization-fields{border-top:0;margin-top:0}.settings-section>button{margin-top:12px}@media(max-width:600px){.settings-fields{grid-template-columns:1fr}.settings-section{padding:20px 0}}
+.settings-page{max-width:960px;margin:auto;padding:0 max(20px,env(safe-area-inset-left)) 28px}.settings-section{padding:24px 0;border-bottom:1px solid var(--line);line-height:1.7}.settings-section h1,.settings-section h2{font-size:18px;margin-bottom:12px}.settings-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0}.settings-actions button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}.source-list{list-style:none;padding:0;margin:16px 0}.source-list li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.source-list small{flex-basis:100%;overflow-wrap:anywhere}.content-details,.manual-pair{margin-top:20px}.layout-editor{border:0;padding:16px 0 0;margin:12px 0 0;min-width:0}.layout-editor legend{font-size:14px}.settings-page summary{cursor:pointer;min-height:44px;padding:10px 0}.saved-message{color:var(--accent);font-size:13px}.settings-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.manual-pair .authorization-fields{border-top:0;margin-top:0}.settings-section>button{margin-top:12px}@media(max-width:600px){.settings-fields{grid-template-columns:1fr}.settings-section{padding:20px 0}}
 </style>

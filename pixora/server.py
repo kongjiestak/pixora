@@ -14,6 +14,7 @@ from pixora.settings import setting
 from pixora.devices import initialize, token_hash
 from pixora.observations import Observation, from_snapshot
 from pixora.database import migrate, append
+from pixora.device_profiles import read_profile,allowed_providers,filter_snapshot,filter_observation,rule_for,Policy
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -45,7 +46,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="Pixora", version="0.3.0.dev1", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.4.0.dev1", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
@@ -76,13 +77,21 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     def invalid():
         raise HTTPException(401, "invalid token", headers={"WWW-Authenticate": "Bearer"})
 
+    def configured_scope(scope):
+        with db() as conn:
+            try:profile,policy,revision,updated=read_profile(conn,scope['id'])
+            except ValueError:raise HTTPException(503,'device configuration invalid')
+        scope.update(profile=profile.model_dump(),policy=policy,revision=revision,updated_at=updated)
+        scope['providers']=allowed_providers(scope['providers'],policy)
+        return scope
+
     def device_scope(token):
         with db() as conn:
             row = conn.execute("SELECT id,providers,modes,expires_at FROM devices WHERE token_hash=? AND revoked=0 AND expires_at>?",
                                (token_hash(token), now().isoformat())).fetchone()
         if row is None:
             invalid()
-        return {"id": row[0], "providers": json.loads(row[1]), "modes": json.loads(row[2]), "expires_at": row[3]}
+        return configured_scope({"id": row[0], "providers": json.loads(row[1]), "modes": json.loads(row[2]), "expires_at": row[3]})
 
     def session_scope(request):
         token = request.cookies.get(cookie_name, "")
@@ -93,7 +102,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
                                (token_hash(token), now().isoformat(), now().isoformat())).fetchone()
         if row is None:
             invalid()
-        return {"id": row[0], "providers": json.loads(row[1]), "modes": json.loads(row[2]), "expires_at": min(row[3], row[4])}
+        return configured_scope({"id": row[0], "providers": json.loads(row[1]), "modes": json.loads(row[2]), "expires_at": min(row[3], row[4])})
 
     def read_scope(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
         if credentials is None:
@@ -102,7 +111,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         if secrets.compare_digest(token, read_token):
             if setting("ALLOW_LEGACY_READ_TOKEN", "true").lower() != "true":
                 invalid()
-            return {"providers": ["codex", "chatgpt", "system", "github", "rss", "tasks", "weather"], "modes": ["real", "demo"], "id": None}
+            return {"providers": ["codex", "chatgpt", "system", "github", "rss", "tasks", "weather"], "modes": ["real", "demo"], "id": None,"policy":Policy()}
         return device_scope(token)
 
     def same_origin(request):
@@ -142,6 +151,15 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         response.delete_cookie(cookie_name, path="/", secure=True, httponly=True, samesite="strict")
         return response
 
+    @app.get('/api/v2/device-config')
+    def device_config(scope=Depends(read_scope)):
+        if scope['id'] is None:raise HTTPException(403,'scoped device required')
+        with db() as conn:
+            name=conn.execute('SELECT name FROM devices WHERE id=?',(scope['id'],)).fetchone()[0]
+        return dict(schema_version=1,device_id=scope['id'],name=name,providers=scope['providers'],
+            profile=scope['profile'],revision=scope['revision'],updated_at=scope['updated_at'],
+            public_only=scope['policy'].public_only)
+
     @app.get("/healthz")
     def health():
         return {"status": "ok"}
@@ -178,9 +196,12 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
                 item.update(collected_at=item["observed_at"], received_at=row[1], age_seconds=age, stale=age > stale or any(w.resets_at and w.resets_at <= now() for w in snap.windows))
                 for window in item["windows"]:
                     window["remaining_percent"] = max(0, min(100, 100-window["used_percent"]))
-                items.append(item)
+                item=filter_snapshot(item,scope['policy'])
+                if item is not None:items.append(item)
             else:
-                items.append(dict(provider=provider, mode=mode, source="unavailable", status="unavailable", observed_at=None, collected_at=None, received_at=None, age_seconds=None, stale=True, windows=[], reason_code="chatgpt_unavailable" if provider == "chatgpt" else "awaiting_collector", reason=None))
+                item=dict(provider=provider, mode=mode, source="unavailable", status="unavailable", observed_at=None, collected_at=None, received_at=None, age_seconds=None, stale=True, windows=[], reason_code="chatgpt_unavailable" if provider == "chatgpt" else "awaiting_collector", reason=None)
+                item=filter_snapshot(item,scope['policy'])
+                if item is not None:items.append(item)
         return {"schema_version": 1, "server_time": now(), "stale_after_seconds": stale, "mode": mode, "device_id": scope["id"], "providers": items}
 
     @app.post('/api/v2/observations', dependencies=[Depends(auth(write_token))])
@@ -206,18 +227,28 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
         for provider,body,received in rows:
             if provider not in scope['providers']:continue
             item=json.loads(body);item.update(received_at=received,stale=datetime.fromisoformat(item['expires_at'])<=now())
-            items.append(item)
+            item=filter_observation(item,scope['policy'])
+            if item is not None:items.append(item)
         return {'schema_version':2,'server_time':now(),'observations':items}
 
     @app.get('/api/v2/history')
     def history(provider: str,mode: str='real',limit: int=Query(default=100,ge=1,le=500),before: int|None=Query(default=None,ge=1,le=9223372036854775807),scope=Depends(read_scope)):
         if provider not in scope['providers'] or mode not in scope['modes']:
             raise HTTPException(403,'device scope not permitted')
+        rule=rule_for(provider,scope['policy'])
+        clauses=['provider=?','mode=?','(? IS NULL OR id<?)'];params=[provider,mode,before,before]
+        for column,values in [('connector_id',rule.connectors),('entity_id',rule.entities)]:
+            if values is not None:
+                clauses.append(column+' IN ('+','.join('?' for _ in values)+')' if values else '0')
+                params.extend(values)
+        if scope['policy'].public_only:clauses.append("json_extract(body,'$.sensitivity')='public'")
         with db() as conn:
-            rows=conn.execute('SELECT id,body,received_at FROM observations WHERE provider=? AND mode=? AND (? IS NULL OR id<?) ORDER BY id DESC LIMIT ?',
-                (provider,mode,before,before,limit)).fetchall()
-        return {'schema_version':2,'items':[dict(id=i,observation=json.loads(body),received_at=received) for i,body,received in rows],
-            'next_before':rows[-1][0] if len(rows)==limit else None}
+            rows=conn.execute('SELECT id,body,received_at FROM observations WHERE '+' AND '.join(clauses)+' ORDER BY id DESC LIMIT ?',(*params,limit)).fetchall()
+        items=[]
+        for i,body,received in rows:
+            item=filter_observation(json.loads(body),scope['policy'])
+            if item is not None:items.append(dict(id=i,observation=item,received_at=received))
+        return {'schema_version':2,'items':items,'next_before':rows[-1][0] if len(rows)==limit else None}
 
     web = Path(web_dir or setting("WEB_DIR", "web/dist"))
     if web.is_dir():

@@ -113,3 +113,7 @@ Dev UI proxies `/api` to port 8000; run the Python service separately. CLI `apm-
 ### Orbit settings
 
 Settings contains Display settings, Data status and Device authorization. Language, motion and shared-screen preferences save automatically in this browser; blocked storage is reported. System/history, developer and RSS views remain under Data status. Token entry is collapsed under Advanced pairing. Administrator demo tools are available only with `?debug=1`; this is a UI disclosure, not an authorization boundary. All APIs retain device-scope checks.
+
+### V0.4 development / 开发中
+
+Orbit now supports a constrained local layout editor and read-only server recommendations. Administrators publish per-device entity/metric/window/entry policies through the local CLI. Existing grants do not expand. Web device administration and remote publication remain pending. See [V0.4 contract and rollback](docs/V0.4.md).

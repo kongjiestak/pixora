@@ -213,5 +213,23 @@
     "debugHint": "Administrator troubleshooting only. Demo mode does not represent real account data.",
     "resetLegacy": "Reset legacy display preferences",
     "unsaved": "This browser cannot save preferences. Changes apply now but may reset after reopening."
+  },
+  "layout": {
+    "title": "Orbit layout",
+    "hint": "Changes save in this browser. Return to preview immediately. Layout preferences do not grant data access.",
+    "clock": "Show clock",
+    "weather": "Show today's weather",
+    "focus": "Ring center window",
+    "primary": "5-hour quota",
+    "weekly": "7-day quota",
+    "density": "Display density",
+    "comfortable": "Comfortable",
+    "compact": "Compact",
+    "preview": "Return to preview",
+    "reset": "Restore server recommendation",
+    "export": "Export layout JSON",
+    "local": "Local layout override · server revision {revision}",
+    "server": "Using server recommendation · revision {revision}",
+    "pair": "Connect a device to edit the layout and read its server recommendation."
   }
 }

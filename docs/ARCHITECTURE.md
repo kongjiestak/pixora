@@ -35,3 +35,7 @@ Per-device provider/mode scopes, expiry and immediate revocation are implemented
 Run on a Mac alone, or keep the service in a PVE Linux VM while the Mac pushes outbound observations. Mac sleep makes data stale. A VPS is optional. ESP32 sizes, NFC, MagSafe and PCB work are future hardware exploration, not current compatibility claims.
 
 V0.3 adds optional bounded plain-text entries to Observation v2, independent github/rss/tasks scopes, and read-only configured collectors. SQLite remains v2; old device grants do not expand. See [V0.3 implementation, limits and acceptance](V0.3.md). Calendar/weather/editor remain future tasks.
+
+## V0.4 device profiles / 设备配置
+
+Devices read `/api/v2/device-config`; the local administrator CLI publishes recommended profiles and restrictive policies. An additive SQLite device_profiles table preserves existing grants by default. Entity/connector/metric/window/entry projections are enforced by v1/v2/history APIs for both Bearer and existing Cookie sessions. The Orbit editor saves local overrides and can restore server recommendations, without granting data permissions. See [V0.4 contracts and privacy-sensitive rollback](V0.4.md).
