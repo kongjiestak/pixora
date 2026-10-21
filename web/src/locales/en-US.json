@@ -184,7 +184,7 @@
   },
   "orbit": {
     "back": "Back to Orbit",
-    "manage": "Manage & data",
+    "manage": "Settings",
     "rhythm": "30 s web read cycle · not upstream collection",
     "presence": "Make Every Screen Useful.",
     "source": "Sources & timestamps",
@@ -192,5 +192,26 @@
     "weather": "Weather",
     "motion": "Motion",
     "idle": "Waiting for connection"
+  },
+  "settings": {
+    "title": "Settings",
+    "display": "Display settings",
+    "local": "Saved automatically in this browser only; other screens are unchanged.",
+    "saved": "Saved. Changes apply immediately when returning to Orbit.",
+    "wakeHint": "Display mode requests a screen wake lock; availability depends on the browser and OS.",
+    "data": "Data status",
+    "privateHidden": "Shared screen hides private data and pauses reads. Retry sign-out if an error is shown.",
+    "content": "View system, developer & RSS",
+    "auth": "Device authorization",
+    "temporary": "Temporary sign-in. Reloading or closing this page requires pairing again.",
+    "signedOut": "This browser is not signed in.",
+    "pairHint": "Scan the private pairing code from your administrator. Safari and the home-screen app may need separate sign-ins.",
+    "manual": "Advanced pairing: enter a token",
+    "tokenPrivate": "Use only to restore sign-in. Never share tokens or pairing codes.",
+    "retryLogout": "Retry sign-out",
+    "diagnostics": "Diagnostics",
+    "debugHint": "Administrator troubleshooting only. Demo mode does not represent real account data.",
+    "resetLegacy": "Reset legacy display preferences",
+    "unsaved": "This browser cannot save preferences. Changes apply now but may reset after reopening."
   }
 }

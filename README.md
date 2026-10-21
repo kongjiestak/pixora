@@ -109,3 +109,7 @@ Dev UI proxies `/api` to port 8000; run the Python service separately. CLI `apm-
 ## License
 
 [MIT](LICENSE), preserving the original APM contributor notice. Third-party dependencies retain their own licenses; see [notices](THIRD_PARTY_NOTICES.md). The Pixora brand is not an exclusive trademark grant.
+
+### Orbit settings
+
+Settings contains Display settings, Data status and Device authorization. Language, motion and shared-screen preferences save automatically in this browser; blocked storage is reported. System/history, developer and RSS views remain under Data status. Token entry is collapsed under Advanced pairing. Administrator demo tools are available only with `?debug=1`; this is a UI disclosure, not an authorization boundary. All APIs retain device-scope checks.
