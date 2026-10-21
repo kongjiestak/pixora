@@ -121,16 +121,21 @@ class InformationCollector:
   return items
 
 class WeatherCollector:
+ def __init__(self,*,latitude=None,longitude=None,label=None,entity=None,timezone=None):
+  self.latitude=latitude;self.longitude=longitude;self.label=label;self.entity=entity;self.timezone=timezone
  async def collect(self):
-  b=base('weather','personal','open-meteo',setting('WEATHER_ENTITY','city'))
-  lat=setting('WEATHER_LATITUDE','');lon=setting('WEATHER_LONGITUDE','')
-  if not lat or not lon:return [Observation(**b,status='unavailable')]
+  b=base('weather','personal','open-meteo',self.entity or setting('WEATHER_ENTITY','city'))
+  lat=self.latitude if self.latitude is not None else setting('WEATHER_LATITUDE','');lon=self.longitude if self.longitude is not None else setting('WEATHER_LONGITUDE','')
+  zone=self.timezone or setting('WEATHER_TIMEZONE','Asia/Shanghai')
+  if lat=='' or lon=='':return [Observation(**b,status='unavailable')]
   try:
+   from zoneinfo import ZoneInfo
+   ZoneInfo(zone)
    latitude=float(lat);longitude=float(lon)
    if not -90<=latitude<=90 or not -180<=longitude<=180:raise ValueError('invalid coordinates')
    from datetime import datetime,timezone
    from urllib.parse import urlencode
-   params=dict(latitude=latitude,longitude=longitude,current='temperature_2m,apparent_temperature,weather_code',daily='temperature_2m_max,temperature_2m_min,precipitation_probability_max',hourly='temperature_2m,weather_code',forecast_days=2,timezone='Asia/Shanghai',timeformat='unixtime')
+   params=dict(latitude=latitude,longitude=longitude,current='temperature_2m,apparent_temperature,weather_code',daily='temperature_2m_max,temperature_2m_min,precipitation_probability_max',hourly='temperature_2m,weather_code',forecast_days=2,timezone=zone,timeformat='unixtime')
    async with asyncio.timeout(30),client() as c:data=json.loads(await read_url(c,'https://api.open-meteo.com/v1/forecast?'+urlencode(params)))
    cur=data['current'];daily=data['daily'];hourly=data['hourly']
    if data['current_units']['temperature_2m']!='°C' or data['hourly_units']['temperature_2m']!='°C':raise ValueError('unexpected units')
@@ -142,5 +147,5 @@ class WeatherCollector:
    for j,i in enumerate(indices):
     metrics.extend([Metric(key=f'weather.hour.{j}.time',value=hourly['time'][i],unit='unix-seconds'),Metric(key=f'weather.hour.{j}.temperature',value=hourly['temperature_2m'][i],unit='celsius'),Metric(key=f'weather.hour.{j}.code',value=hourly['weather_code'][i],unit='wmo-code')])
    if cur['temperature_2m'] is None:raise ValueError('missing current temperature')
-   return [Observation(**b,status='ok',metrics=metrics,entries=[Entry(title=setting('WEATHER_LABEL','City'),detail='Asia/Shanghai',url='https://open-meteo.com/')])]
+   return [Observation(**b,status='ok',metrics=metrics,entries=[Entry(title=self.label or setting('WEATHER_LABEL','City'),detail=zone,url='https://open-meteo.com/')])]
   except (httpx.HTTPError,OSError,TimeoutError,ValueError,KeyError,IndexError,TypeError,OverflowError):return [Observation(**b,status='error')]

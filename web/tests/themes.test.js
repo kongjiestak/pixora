@@ -26,3 +26,9 @@ test('old profiles upgrade safely; new fields persist without accepting CSS inje
  assert.equal(themeStyle(p)['--type-scale'],'1.18')
  assert.deepEqual(layoutProfile({theme:'url(https://evil.example)',accent:'red;display:none',appearance:'invalid',text_size:'10000'}),{...defaultProfile})
 })
+
+test('city selection persists by ID and does not accept invalid coordinates or labels',()=>{
+ const p=layoutProfile({weather_location:4699066})
+ assert.equal(storedProfile(JSON.stringify(p)).weather_location,4699066)
+ for(const value of [-1,0,true,'4699066',2**40])assert.equal(layoutProfile({weather_location:value}).weather_location,null)
+})
