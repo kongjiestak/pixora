@@ -19,7 +19,6 @@
     "overview": "Overview",
     "focus": "Focus",
     "public": "Public screen",
-    "shared": "Shared screen (sign out and hide private widgets)",
     "token": "Read-only token",
     "tokenHint": "Kept in this page memory only",
     "language": "Language",
@@ -27,7 +26,7 @@
     "real": "Real observations",
     "demo": "Demo data",
     "connect": "Connect / Refresh",
-    "disconnect": "Sign out this device",
+    "disconnect": "Sign out",
     "display": "Display mode",
     "exit": "Exit display",
     "connectHint": "Real data is not connected. Enter a device read-only token or scan your administrator’s private pairing QR code. This screen is not yet ready for live-data acceptance."
@@ -105,7 +104,7 @@
     "remembered": "Device signed in · Expires {time}",
     "expired": "Device authorization is invalid or expired. Scan your pairing QR again.",
     "loginFailed": "Device sign-in failed. Check the connection and allow cookies for this site.",
-    "logoutFailed": "Data cleared on this page, but server sign-out is incomplete. Reconnect and select Sign out this device again."
+    "logoutFailed": "Data cleared on this page, but server sign-out is incomplete. Reconnect and select Sign out again."
   },
   "system": {
     "title": "System monitor",
@@ -200,7 +199,7 @@
     "saved": "Saved. Changes apply immediately when returning to Orbit.",
     "wakeHint": "Display mode requests a screen wake lock; availability depends on the browser and OS.",
     "data": "Data status",
-    "privateHidden": "Shared screen hides private data and pauses reads. Retry sign-out if an error is shown.",
+    "privateHidden": "Private data is hidden. Scan a pairing code to sign in again.",
     "content": "View system, developer & RSS",
     "auth": "Device authorization",
     "temporary": "Temporary sign-in. Reloading or closing this page requires pairing again.",
@@ -212,7 +211,8 @@
     "diagnostics": "Diagnostics",
     "debugHint": "Administrator troubleshooting only. Demo mode does not represent real account data.",
     "resetLegacy": "Reset legacy display preferences",
-    "unsaved": "This browser cannot save preferences. Changes apply now but may reset after reopening."
+    "unsaved": "This browser cannot save preferences. Changes apply now but may reset after reopening.",
+    "logoutHint": "Signing out clears private data on this page. Scan a pairing code to sign in again. Other devices stay signed in."
   },
   "layout": {
     "title": "Orbit layout",
