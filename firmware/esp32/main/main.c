@@ -40,7 +40,7 @@
 static char ssid[33],password[65],server[257],token[129];
 static EventGroupHandle_t network;
 static QueueHandle_t wifi_commands,usb_messages;
-static atomic_bool usb_enabled;
+static atomic_bool usb_enabled,runtime_ready;
 static char usb_nonce[33],usb_hello_proof[65];
 static uint32_t usb_sequence;
 static int64_t usb_signal_at;
@@ -319,6 +319,7 @@ static void native_connect(wifi_ui_command *command){
     memset(command,0,sizeof(*command));bsp_display_lock(-1);screen_ui_wifi_connect_result(ok,message);bsp_display_unlock();
 }
 static void usb_reader(void *arg){
+    while(!atomic_load(&runtime_ready))vTaskDelay(pdMS_TO_TICKS(20));
     (void)arg;char *line=malloc(USB_FRAME_MAX+1);if(!line){vTaskDelete(NULL);return;}
     size_t used=0;bool overflow=false;unsigned char buffer[256];
     while(true){
@@ -360,6 +361,7 @@ static bool handle_usb(void){
     return false;
 }
 static void collector(void *arg){
+    while(!atomic_load(&runtime_ready))vTaskDelay(pdMS_TO_TICKS(20));
     (void)arg;int failures=0,ticks=0;int64_t next_wifi_attempt=0;
     while(true){
         if(atomic_exchange(&setup_requested,false))setup_start();
@@ -389,6 +391,8 @@ void app_main(void){
     ESP_ERROR_CHECK(nvs_flash_init());load_config();wifi_commands=xQueueCreate(1,sizeof(wifi_ui_command));usb_messages=xQueueCreate(1,sizeof(usb_message));assert(wifi_commands&&usb_messages);
     for(int i=0;i<16;i++)snprintf(usb_nonce+i*2,3,"%02x",(unsigned)(esp_random()&255));
     char hello[40];snprintf(hello,sizeof(hello),"hello %s",usb_nonce);assert(usb_digest(token,hello,strlen(hello),usb_hello_proof));
+    assert(xTaskCreate(usb_reader,"pixora-usb",8192,NULL,5,NULL)==pdPASS);
+    assert(xTaskCreate(collector,"pixora-poll",12288,NULL,3,NULL)==pdPASS);
     display_init();
     ESP_ERROR_CHECK(esp_netif_init());ESP_ERROR_CHECK(esp_event_loop_create_default());network=xEventGroupCreate();esp_netif_create_default_wifi_sta();esp_netif_create_default_wifi_ap();
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();ESP_ERROR_CHECK(esp_wifi_init(&init));ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
@@ -410,6 +414,5 @@ void app_main(void){
     else if(!ssid[0]){bsp_display_lock(-1);screen_ui_open_wifi();bsp_display_unlock();}
     usb_serial_jtag_driver_config_t usb_config={.tx_buffer_size=256,.rx_buffer_size=4096};
     if(!usb_serial_jtag_is_driver_installed())ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_config));
-    xTaskCreate(usb_reader,"pixora-usb",8192,NULL,5,NULL);
-    xTaskCreate(collector,"pixora-poll",12288,NULL,3,NULL);
+    atomic_store(&runtime_ready,true);
 }
