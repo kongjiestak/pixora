@@ -19,3 +19,10 @@ auth.json
 *.key
 coverage/
 work/
+
+# Local ESP-IDF output and private provisioning
+firmware/esp32/build/
+firmware/esp32/managed_components/
+firmware/esp32/sdkconfig
+firmware/esp32/sdkconfig.old
+*.private.bin
