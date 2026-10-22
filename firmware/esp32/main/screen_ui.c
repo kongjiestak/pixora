@@ -3,6 +3,7 @@
 #include "screen_i18n.h"
 #include "theme_tokens.h"
 #include "lvgl.h"
+#include "src/core/lv_obj_event_private.h"
 LV_FONT_DECLARE(pixora_cjk_18);
 LV_FONT_DECLARE(pixora_cjk_24);
 #include "nvs.h"
@@ -15,7 +16,7 @@ LV_FONT_DECLARE(pixora_cjk_24);
 #include <string.h>
 #include <time.h>
 #include <math.h>
-typedef struct {lv_obj_t *glyph[32];char value[129];int angle;bool lower;} arc_text;
+typedef struct {lv_obj_t *glyph[32],*group,*image;lv_draw_buf_t *cache;int x,y;char value[129];int angle;bool lower;} arc_text;
 typedef struct {
  lv_obj_t *container,*wake_layer,*home_controls,*rings[2],*center,*caption,*detail,*legends[2],*digits[4];
  lv_obj_t *bot_eyes[2],*bot_arms[2],*bot_caption,*bot_source;
@@ -50,6 +51,8 @@ static bool home_dirty=true;
 static bool has_data,paused,motion=true,settings_saved=true;
 static unsigned theme,accent,focus,page;
 static int64_t received;
+static bool face_save_pending;
+static uint32_t face_save_at;
 
 static char connection[64]="CONNECTING";
 static void (*setup_callback)(void);
@@ -67,6 +70,7 @@ static void render(void);
 static void render_now(void);
 static const char *L(const char *value){return screen_translate(chinese,value);}
 static void persist(void){
+ face_save_pending=false;
  nvs_handle_t h;esp_err_t e=nvs_open("pixora",NVS_READWRITE,&h);
  if(e==ESP_OK){e=nvs_set_u8(h,"ui_theme",theme);if(e==ESP_OK)e=nvs_set_u8(h,"ui_accent",accent);if(e==ESP_OK)e=nvs_set_u8(h,"ui_motion",motion);if(e==ESP_OK)e=nvs_set_u8(h,"ui_focus",focus);if(e==ESP_OK)e=nvs_set_u8(h,"usb_bridge",usb_on);if(e==ESP_OK)e=nvs_set_u8(h,"ble_bridge",ble_on);if(e==ESP_OK)e=nvs_set_u8(h,"ui_lang",chinese);if(e==ESP_OK)e=nvs_set_u8(h,"ui_clock",clock_mode);if(e==ESP_OK)e=nvs_set_u8(h,"ui_face",face);if(e==ESP_OK)e=nvs_set_u8(h,"ui_night",night);if(e==ESP_OK)e=nvs_set_u8(h,"ui_bright",brightness);if(e==ESP_OK)e=nvs_set_u8(h,"ui_rotation",rotation);if(e==ESP_OK)e=nvs_set_i32(h,"ui_tz",timezone_quarters);if(e==ESP_OK)e=nvs_commit(h);nvs_close(h);}settings_saved=e==ESP_OK;
 }
@@ -86,6 +90,7 @@ static void arc_value(arc_text *field,const char *value){
  char compact[129]={0};for(unsigned i=0;i<length;i++)strcat(compact,glyphs[i]);(void)bytes;
  if(!strcmp(field->value,compact))return;
  snprintf(field->value,sizeof(field->value),"%s",compact);
+ lv_obj_remove_flag(field->group,LV_OBJ_FLAG_HIDDEN);
  const lv_font_t *font=&arc_font;const double radius=214.0;double widths[32]={0},total=0,cursor=0;
  for(unsigned i=0;i<length;i++){widths[i]=lv_font_get_glyph_width(font,codes[i],0)+1.5;total+=widths[i];}
  for(unsigned i=0;i<32;i++){
@@ -93,13 +98,27 @@ static void arc_value(arc_text *field,const char *value){
   double angle=field->angle*M_PI/180+(field->lower?-1:1)*(cursor+widths[i]/2-total/2)/radius;cursor+=widths[i];
   label_value(field->glyph[i],glyphs[i]);lv_obj_remove_flag(field->glyph[i],LV_OBJ_FLAG_HIDDEN);
   lv_obj_set_style_transform_pivot_x(field->glyph[i],lv_pct(50),0);lv_obj_set_style_transform_pivot_y(field->glyph[i],lv_pct(50),0);lv_obj_set_style_transform_rotation(field->glyph[i],(int)(angle*1800/M_PI)+(field->lower?-900:900),0);
-  lv_obj_update_layout(field->glyph[i]);lv_obj_set_align(field->glyph[i],LV_ALIGN_TOP_LEFT);lv_obj_set_pos(field->glyph[i],(int)lround(240+radius*cos(angle))-lv_obj_get_width(field->glyph[i])/2,(int)lround(240+radius*sin(angle))-lv_obj_get_height(field->glyph[i])/2);
+  lv_obj_update_layout(field->glyph[i]);lv_obj_set_align(field->glyph[i],LV_ALIGN_TOP_LEFT);lv_obj_set_pos(field->glyph[i],(int)lround(240+radius*cos(angle))-field->x-lv_obj_get_width(field->glyph[i])/2,(int)lround(240+radius*sin(angle))-field->y-lv_obj_get_height(field->glyph[i])/2);
  }
-
+ /* Rasterize only when text changes, never on an ordinary page switch. */
+ if(!field->cache)field->cache=lv_snapshot_create_draw_buf(field->group,LV_COLOR_FORMAT_ARGB8888);
+ if(field->cache&&lv_snapshot_take_to_draw_buf(field->group,LV_COLOR_FORMAT_ARGB8888,field->cache)==LV_RESULT_OK){
+  lv_image_set_src(field->image,field->cache);lv_obj_remove_flag(field->image,LV_OBJ_FLAG_HIDDEN);lv_obj_add_flag(field->group,LV_OBJ_FLAG_HIDDEN);
+ }else lv_obj_add_flag(field->image,LV_OBJ_FLAG_HIDDEN); /* Keep live glyphs on allocation failure. */
 }
+static void arc_hit_test(lv_event_t *event){
+ lv_hit_test_info_t *info=lv_event_get_param(event);int x=info->point->x-240,y=info->point->y-240;
+ int radius2=x*x+y*y;info->res=info->res&&radius2>=196*196&&radius2<=238*238;
+}
+static void arc_cache_delete(lv_event_t *event){arc_text *field=lv_event_get_user_data(event);if(field->cache){lv_draw_buf_destroy(field->cache);field->cache=NULL;}}
 static void arc_create(arc_text *field,int angle,bool lower,uint32_t color){
  memset(field,0,sizeof(*field));field->angle=angle;field->lower=lower;
+ field->x=(angle==315||angle==45)?240:0;field->y=lower?240:0;
+ field->group=lv_obj_create(root);lv_obj_remove_style_all(field->group);lv_obj_set_size(field->group,240,240);lv_obj_set_pos(field->group,field->x,field->y);lv_obj_remove_flag(field->group,LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);
+ field->image=lv_image_create(root);lv_obj_set_pos(field->image,field->x,field->y);lv_obj_add_flag(field->image,LV_OBJ_FLAG_HIDDEN);lv_obj_add_event_cb(field->image,arc_cache_delete,LV_EVENT_DELETE,field);
+ lv_obj_t *saved_root=root;root=field->group;
  for(int i=0;i<32;i++){field->glyph[i]=text("",&arc_font,0,0,color);lv_obj_set_style_text_font(field->glyph[i],&arc_font,0);lv_obj_add_flag(field->glyph[i],LV_OBJ_FLAG_HIDDEN);}
+ root=saved_root;
 }
 static void update_digits(const struct tm *tm,bool valid){
  if(!clock_mode)return;
@@ -120,7 +139,7 @@ static void render(void){if(render_pending)return;render_pending=true;if(lv_asyn
 static void home_menu(lv_event_t *event){(void)event;if(page)return;if(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN))return;page=1;render();}
 static void gesture(lv_event_t *event){
  (void)event;if(page||(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN)))return;lv_indev_t *input=lv_indev_active();if(!input)return;
- lv_dir_t direction=lv_indev_get_gesture_dir(input);if(direction==LV_DIR_LEFT||direction==LV_DIR_RIGHT){face=(face+(direction==LV_DIR_LEFT?1:2))%3;clock_mode=face==1;persist();render();}
+ lv_dir_t direction=lv_indev_get_gesture_dir(input);if(direction==LV_DIR_LEFT||direction==LV_DIR_RIGHT){face=(face+(direction==LV_DIR_LEFT?1:2))%3;clock_mode=face==1;face_save_pending=true;face_save_at=lv_tick_get();render();}
 }
 static void wake(lv_event_t *event){(void)event;lv_display_trigger_activity(NULL);if(home_controls)lv_obj_remove_flag(home_controls,LV_OBJ_FLAG_HIDDEN);if(wake_layer)lv_obj_add_flag(wake_layer,LV_OBJ_FLAG_HIDDEN);}
 static void action(lv_event_t *event){
@@ -211,7 +230,7 @@ static void update_clock(void){
 
 }
 static void tick(lv_timer_t *t){
- (void)t;if(paused||render_pending)return;
+ (void)t;if(face_save_pending&&lv_tick_get()-face_save_at>=1000)persist();if(paused||render_pending)return;
  time_t local=time(NULL)+timezone_quarters*900;struct tm tm;gmtime_r(&local,&tm);
  bool idle=lv_display_get_inactive_time(NULL)>15000;
  int target=(night&&time(NULL)>1700000000&&(tm.tm_hour>=22||tm.tm_hour<7)&&idle)?8:(int)brightness;
@@ -259,6 +278,7 @@ static void render_now(void){
  wake_layer=NULL;home_controls=NULL;
  /* Outer information band: radius 216; quota rings stay inside radius 180. */
  arc_create(&perimeter[0],225,false,p->ink);arc_create(&perimeter[1],315,false,p->muted);arc_create(&perimeter[2],135,true,p->ink);arc_create(&perimeter[3],45,true,p->muted);
+ for(int f=2;f<4;f++){lv_obj_add_flag(perimeter[f].image,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(perimeter[f].image,arc_hit_test,LV_EVENT_HIT_TEST,NULL);lv_obj_add_event_cb(perimeter[f].image,action,LV_EVENT_CLICKED,(void*)9);}
  for(int f=2;f<4;f++)for(int i=0;i<32;i++){lv_obj_add_flag(perimeter[f].glyph[i],LV_OBJ_FLAG_CLICKABLE);lv_obj_set_ext_click_area(perimeter[f].glyph[i],5);lv_obj_add_event_cb(perimeter[f].glyph[i],action,LV_EVENT_CLICKED,(void*)9);}
  if(face==2){
   text("PIXORA BOT",&lv_font_montserrat_18,0,100,p->muted);

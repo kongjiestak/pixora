@@ -38,6 +38,11 @@ static void image(const char *path){FILE *f=fopen(path,"wb");assert(f);fprintf(f
 static void pump(unsigned ms){for(unsigned i=0;i<ms;i+=10){elapsed+=10;if(elapsed%1000==0)epoch++;lv_tick_inc(10);lv_timer_handler();}}
 static lv_obj_t *find(lv_obj_t *parent,const char *value){if(lv_obj_has_flag(parent,LV_OBJ_FLAG_HIDDEN))return NULL;if(lv_obj_check_type(parent,&lv_label_class)&&!strcmp(lv_label_get_text(parent),value))return parent;for(unsigned i=0;i<lv_obj_get_child_count(parent);i++){lv_obj_t *r=find(lv_obj_get_child(parent,i),value);if(r)return r;}return NULL;}
 static void click(const char *value){lv_obj_t *label=find(lv_screen_active(),value);if(!label){fprintf(stderr,"Missing control: %s\n",value);abort();}lv_obj_update_layout(lv_screen_active());lv_area_t a;lv_obj_get_coords(label,&a);point=(lv_point_t){(a.x1+a.x2)/2,(a.y1+a.y2)/2};pressed=true;pump(90);pressed=false;pump(150);}
+static unsigned cached_images(lv_obj_t *obj){
+ if(lv_obj_has_flag(obj,LV_OBJ_FLAG_HIDDEN))return 0;
+ unsigned n=0;if(lv_obj_check_type(obj,&lv_image_class)){assert(lv_image_get_src(obj));n++;}
+ for(unsigned i=0;i<lv_obj_get_child_count(obj);i++)n+=cached_images(lv_obj_get_child(obj,i));return n;
+}
 static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.x=250;pump(40);point.x=140;pump(40);pressed=false;pump(150);}
 static void setup(void){}
 static bool wifi(const wifi_ui_command *c){(void)c;return true;}
@@ -48,7 +53,7 @@ int main(void){
  setenv("TZ","UTC0",1);tzset();lv_init();lv_display_t *d=lv_display_create(480,480);static uint8_t buffer[480*PIXORA_DRAW_ROWS*2];lv_display_set_buffers(d,buffer,NULL,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(d,flush);lv_display_add_event_cb(d,pixora_display_align_area,LV_EVENT_INVALIDATE_AREA,NULL);
  pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_pointer);
  nvs_set_u8(1,"ui_clock",1);screen_ui_create(setup,wifi,usb,ble);pump(500);
- assert(find(lv_screen_active(),":"));image("/tmp/pixora-ui-digital.ppm");
+ assert(find(lv_screen_active(),":"));assert(cached_images(lv_screen_active())==4);image("/tmp/pixora-ui-digital.ppm");
  for(unsigned i=0;i<4;i++){click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));click(i?"Theme / paper":"Theme / orbit");click("paper");assert(find(lv_screen_active(),"Theme / paper"));click("Back to Orbit");assert(find(lv_screen_active(),":"));}
  click(LV_SYMBOL_SETTINGS);click("Screen / Clock");click("Language / English");assert(find(lv_screen_active(),"语言 / 简体中文"));image("/tmp/pixora-ui-zh-settings.ppm");click("返回");click("返回显示");assert(find(lv_screen_active(),"秒"));
  uint8_t lang=0;assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==1);
@@ -65,6 +70,7 @@ int main(void){
  image("/tmp/pixora-ui-ble-source.ppm");click("Back to Orbit");
  swipe();assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
  for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
+ pump(1100);uint8_t saved_face=0;assert(nvs_get_u8(1,"ui_face",&saved_face)==ESP_OK&&saved_face==2);assert(cached_images(lv_screen_active())==4);
  pump(16000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
  assert(find(lv_screen_active(),"Connection / Source"));image("/tmp/pixora-ui-visible-source-entry.ppm");
  puts("PASS: cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
