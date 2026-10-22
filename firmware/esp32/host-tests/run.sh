@@ -37,3 +37,13 @@ ${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -fsanitize=ad
 ${CC:-cc} -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
   -I"$root/main" "$root/host-tests/test_orientation.c" -o "$tmp/orientation-test"
 "$tmp/orientation-test"
+
+${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -DMBEDTLS_CONFIG_FILE='"ble_mbedtls_config.h"' \
+  -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
+  -I"$root/main" -I"$root/host-tests" -I"$mbed/include" -I"$mbed/library" \
+  "$root/host-tests/test_ble_wire.c" "$root/main/ble_wire.c" \
+  "$mbed/library/gcm.c" "$mbed/library/aes.c" "$mbed/library/cipher.c" \
+  "$mbed/library/cipher_wrap.c" "$mbed/library/block_cipher.c" \
+  "$mbed/library/constant_time.c" "$mbed/library/sha256.c" "$mbed/library/platform_util.c" \
+  -o "$tmp/ble-wire-test"
+"$tmp/ble-wire-test" "$root/host-tests/ble-fixture.hex"
