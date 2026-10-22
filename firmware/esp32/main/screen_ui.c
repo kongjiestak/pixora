@@ -42,7 +42,8 @@ static uint32_t last_clock_tick;
 static lv_obj_t *root;
 static lv_timer_t *timer;
 static quota_view snapshot;
-static bool usb_source,usb_on;
+static bool usb_source,usb_on,ble_on;
+static void (*ble_callback)(bool);
 static void (*usb_callback)(bool);
 static bool home_dirty=true;
 static bool has_data,paused,motion=true,settings_saved=true;
@@ -66,7 +67,7 @@ static void render_now(void);
 static const char *L(const char *value){return screen_translate(chinese,value);}
 static void persist(void){
  nvs_handle_t h;esp_err_t e=nvs_open("pixora",NVS_READWRITE,&h);
- if(e==ESP_OK){e=nvs_set_u8(h,"ui_theme",theme);if(e==ESP_OK)e=nvs_set_u8(h,"ui_accent",accent);if(e==ESP_OK)e=nvs_set_u8(h,"ui_motion",motion);if(e==ESP_OK)e=nvs_set_u8(h,"ui_focus",focus);if(e==ESP_OK)e=nvs_set_u8(h,"usb_bridge",usb_on);if(e==ESP_OK)e=nvs_set_u8(h,"ui_lang",chinese);if(e==ESP_OK)e=nvs_set_u8(h,"ui_clock",clock_mode);if(e==ESP_OK)e=nvs_set_u8(h,"ui_face",face);if(e==ESP_OK)e=nvs_set_u8(h,"ui_night",night);if(e==ESP_OK)e=nvs_set_u8(h,"ui_bright",brightness);if(e==ESP_OK)e=nvs_set_u8(h,"ui_rotation",rotation);if(e==ESP_OK)e=nvs_set_i32(h,"ui_tz",timezone_quarters);if(e==ESP_OK)e=nvs_commit(h);nvs_close(h);}settings_saved=e==ESP_OK;
+ if(e==ESP_OK){e=nvs_set_u8(h,"ui_theme",theme);if(e==ESP_OK)e=nvs_set_u8(h,"ui_accent",accent);if(e==ESP_OK)e=nvs_set_u8(h,"ui_motion",motion);if(e==ESP_OK)e=nvs_set_u8(h,"ui_focus",focus);if(e==ESP_OK)e=nvs_set_u8(h,"usb_bridge",usb_on);if(e==ESP_OK)e=nvs_set_u8(h,"ble_bridge",ble_on);if(e==ESP_OK)e=nvs_set_u8(h,"ui_lang",chinese);if(e==ESP_OK)e=nvs_set_u8(h,"ui_clock",clock_mode);if(e==ESP_OK)e=nvs_set_u8(h,"ui_face",face);if(e==ESP_OK)e=nvs_set_u8(h,"ui_night",night);if(e==ESP_OK)e=nvs_set_u8(h,"ui_bright",brightness);if(e==ESP_OK)e=nvs_set_u8(h,"ui_rotation",rotation);if(e==ESP_OK)e=nvs_set_i32(h,"ui_tz",timezone_quarters);if(e==ESP_OK)e=nvs_commit(h);nvs_close(h);}settings_saved=e==ESP_OK;
 }
 static void label_value(lv_obj_t *label,const char *value){value=L(value);if(strcmp(lv_label_get_text(label),value))lv_label_set_text(label,value);}
 static lv_obj_t *text(const char *value,const lv_font_t *font,int x,int y,uint32_t color){
@@ -123,7 +124,8 @@ static void wake(lv_event_t *event){(void)event;lv_display_trigger_activity(NULL
 static void action(lv_event_t *event){
  unsigned id=(unsigned)(uintptr_t)lv_event_get_user_data(event);
  ESP_LOGI("pixora_ui","navigation action=%u page=%u",id,page);
- if(id==43){chinese=!chinese;persist();page=10;}
+ if(id==44){ble_on=!ble_on;persist();if(ble_callback)ble_callback(ble_on);}
+ else if(id==43){chinese=!chinese;persist();page=10;}
  else if(id==16)page=10;
  else if(id==17){brightness=brightness>=100?20:brightness+20;persist();}
  else if(id==18){night=!night;persist();}
@@ -202,7 +204,7 @@ static void update_clock(void){
  if(w->known&&now<w->expires_at)snprintf(value,sizeof(value),"%s %.0f C",L(weather_kind(w->code)),w->temperature);
  else {snprintf(value,sizeof(value),"WEATHER --");}
  arc_value(&perimeter[2],value);
- const char *short_state=strstr(connection,"CONNECTED")?usb_source?"USB ONLINE":"WI-FI ONLINE":strstr(connection,"PAIR")?"PAIR AGAIN":strstr(connection,"STALE")?"DATA STALE":"OFFLINE";
+ const char *short_state=strstr(connection,"CONNECTED")?usb_source?strstr(connection,"MAC BLE")?"BLE ONLINE":"USB ONLINE":"WI-FI ONLINE":strstr(connection,"PAIR")?"PAIR AGAIN":strstr(connection,"STALE")?"DATA STALE":"OFFLINE";
  arc_value(&perimeter[3],short_state);update_digits(&tm,valid);update_bot();
 
 }
@@ -243,13 +245,14 @@ static void render_now(void){
   if(page==2||page==3)for(unsigned i=0;i<4;i++)button(page==2?screen_theme_names[i]:screen_accent_names[i],0,90+i*58,320,(page==2?20:30)+i);
   if(page==4){text("This pauses the status display.",&lv_font_montserrat_18,0,115,p->muted);text("Existing Wi-Fi is kept until Save.",&lv_font_montserrat_18,0,152,p->muted);button("Open phone setup",0,230,330,8);}
   if(page==5){
-   text(connection,&lv_font_montserrat_18,0,94,p->ink);text(usb_source?"Transport / Mac USB bridge":"Transport / Wi-Fi + HTTPS",&lv_font_montserrat_18,0,144,p->muted);text("Source / Codex App Server",&lv_font_montserrat_18,0,184,p->muted);
+   text(connection,&lv_font_montserrat_18,0,94,p->ink);text(usb_source?strstr(connection,"MAC BLE")?"Transport / Mac BLE bridge":"Transport / Mac USB bridge":"Transport / Wi-Fi + HTTPS",&lv_font_montserrat_18,0,144,p->muted);text("Source / Codex App Server",&lv_font_montserrat_18,0,184,p->muted);
    char stamp[60];time_t collected=snapshot.collected_at;struct tm utc;
    if(collected&&gmtime_r(&collected,&utc))strftime(stamp,sizeof(stamp),"Collected / %m-%d %H:%M UTC",&utc);else strcpy(stamp,"No collected data");text(stamp,&lv_font_montserrat_18,0,224,p->muted);
    lv_obj_t *city=text(snapshot.weather.known?snapshot.weather.city:snapshot.weather.present?"Weather unavailable":"Weather not authorized",&wifi_font,0,260,p->muted);lv_obj_set_width(city,350);lv_label_set_long_mode(city,LV_LABEL_LONG_DOT);lv_obj_set_style_text_align(city,LV_TEXT_ALIGN_CENTER,0);text("Weather / Open-Meteo.com",&lv_font_montserrat_14,0,284,p->muted);text("CC BY 4.0 / timezone is separate",&lv_font_montserrat_14,0,310,p->muted);
    button(usb_on?"Mac USB / ON":"Mac USB / OFF",0,333,300,15);
+   button(ble_on?"Mac BLE / ON":"Mac BLE / OFF",0,382,300,44);
   }
-  button(page==1||page==5?"Back to Orbit":"Back",0,page==5?397:384,280,page==1||page==5?2:page==4?42:1);return;
+  button(page==1||page==5?"Back to Orbit":"Back",0,page==5?431:384,280,page==1||page==5?2:page==4?42:1);return;
  }
  wake_layer=NULL;home_controls=NULL;
  /* Outer information band: radius 216; quota rings stay inside radius 180. */
@@ -295,13 +298,14 @@ static void refresh_measure(lv_event_t *event){
  int64_t elapsed=esp_timer_get_time()-started;started=0;total+=elapsed;if(elapsed>maximum)maximum=elapsed;
  if(++samples==10){ESP_LOGI("pixora_ui","refresh samples=10 mean_ms=%lld max_ms=%lld",(long long)(total/10000),(long long)(maximum/1000));samples=0;total=maximum=0;}
 }
-void screen_ui_create(void (*request_setup)(void),bool (*request_wifi)(const wifi_ui_command *),void (*request_usb)(bool)){
- setup_callback=request_setup;wifi_callback=request_wifi;usb_callback=request_usb;wifi_font=lv_font_montserrat_18;cjk_font=pixora_cjk_18;cjk_font.fallback=&lv_font_simsun_16_cjk;wifi_font.fallback=&cjk_font;root=NULL;display_root=lv_screen_active();paused=false;page=0;
- nvs_handle_t h;if(nvs_open("pixora",NVS_READONLY,&h)==ESP_OK){uint8_t v;if(nvs_get_u8(h,"ui_theme",&v)==ESP_OK&&v<4)theme=v;if(nvs_get_u8(h,"ui_accent",&v)==ESP_OK&&v<4)accent=v;if(nvs_get_u8(h,"ui_motion",&v)==ESP_OK)motion=!!v;if(nvs_get_u8(h,"ui_focus",&v)==ESP_OK&&v<2)focus=v;if(nvs_get_u8(h,"usb_bridge",&v)==ESP_OK)usb_on=!!v;if(nvs_get_u8(h,"ui_lang",&v)==ESP_OK)chinese=!!v;if(nvs_get_u8(h,"ui_clock",&v)==ESP_OK)clock_mode=!!v;if(nvs_get_u8(h,"ui_night",&v)==ESP_OK)night=!!v;if(nvs_get_u8(h,"ui_bright",&v)==ESP_OK&&v>=8&&v<=100)brightness=v;if(nvs_get_u8(h,"ui_rotation",&v)==ESP_OK&&v<4)rotation=v;int32_t zone;if(nvs_get_i32(h,"ui_tz",&zone)==ESP_OK&&zone>=-48&&zone<=56)timezone_quarters=zone;face=clock_mode?1:0;if(nvs_get_u8(h,"ui_face",&v)==ESP_OK&&v<3)face=v;clock_mode=face==1;nvs_close(h);}
+void screen_ui_create(void (*request_setup)(void),bool (*request_wifi)(const wifi_ui_command *),void (*request_usb)(bool),void (*request_ble)(bool)){
+ ble_callback=request_ble;setup_callback=request_setup;wifi_callback=request_wifi;usb_callback=request_usb;wifi_font=lv_font_montserrat_18;cjk_font=pixora_cjk_18;cjk_font.fallback=&lv_font_simsun_16_cjk;wifi_font.fallback=&cjk_font;root=NULL;display_root=lv_screen_active();paused=false;page=0;
+ nvs_handle_t h;if(nvs_open("pixora",NVS_READONLY,&h)==ESP_OK){uint8_t v;if(nvs_get_u8(h,"ui_theme",&v)==ESP_OK&&v<4)theme=v;if(nvs_get_u8(h,"ui_accent",&v)==ESP_OK&&v<4)accent=v;if(nvs_get_u8(h,"ui_motion",&v)==ESP_OK)motion=!!v;if(nvs_get_u8(h,"ui_focus",&v)==ESP_OK&&v<2)focus=v;if(nvs_get_u8(h,"usb_bridge",&v)==ESP_OK)usb_on=!!v;if(nvs_get_u8(h,"ble_bridge",&v)==ESP_OK)ble_on=!!v;if(nvs_get_u8(h,"ui_lang",&v)==ESP_OK)chinese=!!v;if(nvs_get_u8(h,"ui_clock",&v)==ESP_OK)clock_mode=!!v;if(nvs_get_u8(h,"ui_night",&v)==ESP_OK)night=!!v;if(nvs_get_u8(h,"ui_bright",&v)==ESP_OK&&v>=8&&v<=100)brightness=v;if(nvs_get_u8(h,"ui_rotation",&v)==ESP_OK&&v<4)rotation=v;int32_t zone;if(nvs_get_i32(h,"ui_tz",&zone)==ESP_OK&&zone>=-48&&zone<=56)timezone_quarters=zone;face=clock_mode?1:0;if(nvs_get_u8(h,"ui_face",&v)==ESP_OK&&v<3)face=v;clock_mode=face==1;nvs_close(h);}
  arc_font=lv_font_montserrat_24;arc_cjk_font=pixora_cjk_24;arc_cjk_font.fallback=&cjk_font;arc_font.fallback=&arc_cjk_font;
  lv_display_add_event_cb(lv_display_get_default(),refresh_measure,LV_EVENT_REFR_START,NULL);lv_display_add_event_cb(lv_display_get_default(),refresh_measure,LV_EVENT_REFR_READY,NULL);lv_display_add_event_cb(lv_display_get_default(),refresh_measure,LV_EVENT_RENDER_START,NULL);
 
  if(usb_callback){usb_callback(usb_on);}
+ if(ble_callback){ble_callback(ble_on);}
  render();if(!timer)timer=lv_timer_create(tick,250,NULL);
 }
 void screen_ui_update(const quota_view *view,bool fetched,const char *state,int64_t latest,bool from_usb){

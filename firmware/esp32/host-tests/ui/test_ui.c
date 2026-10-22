@@ -41,10 +41,12 @@ static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.
 static void setup(void){}
 static bool wifi(const wifi_ui_command *c){(void)c;return true;}
 static void usb(bool on){(void)on;}
+static bool ble_state;
+static void ble(bool on){ble_state=on;}
 int main(void){
  setenv("TZ","UTC0",1);tzset();lv_init();lv_display_t *d=lv_display_create(480,480);static uint8_t buffer[480*40*2];lv_display_set_buffers(d,buffer,NULL,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(d,flush);
  pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_pointer);
- nvs_set_u8(1,"ui_clock",1);screen_ui_create(setup,wifi,usb);pump(500);
+ nvs_set_u8(1,"ui_clock",1);screen_ui_create(setup,wifi,usb,ble);pump(500);
  assert(find(lv_screen_active(),":"));image("/tmp/pixora-ui-digital.ppm");
  for(unsigned i=0;i<4;i++){click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));click(i?"Theme / paper":"Theme / orbit");click("paper");assert(find(lv_screen_active(),"Theme / paper"));click("Back to Orbit");assert(find(lv_screen_active(),":"));}
  click(LV_SYMBOL_SETTINGS);click("Screen / Clock");click("Language / English");assert(find(lv_screen_active(),"语言 / 简体中文"));image("/tmp/pixora-ui-zh-settings.ppm");click("返回");click("返回显示");assert(find(lv_screen_active(),"秒"));
@@ -53,6 +55,13 @@ int main(void){
  click(LV_SYMBOL_SETTINGS);click("屏幕与时钟");click("语言 / 简体中文");click("Back");click("Back to Orbit");assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==0);
  quota_view fixture={.collected_at=epoch,.primary={.known=true,.remaining=84},.weekly={.known=true,.remaining=98},.activity={.state=1,.expires_at=epoch+15}};
  screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);
+ click("S");assert(find(lv_screen_active(),"Connection / Source"));
+ click("Mac BLE / OFF");assert(ble_state);uint8_t saved_ble=0;
+ assert(nvs_get_u8(1,"ble_bridge",&saved_ble)==ESP_OK&&saved_ble==1);
+ click("Mac BLE / ON");assert(!ble_state);
+ lv_area_t ble_area,back_area;lv_obj_get_coords(lv_obj_get_parent(find(lv_screen_active(),"Mac BLE / OFF")),&ble_area);
+ lv_obj_get_coords(lv_obj_get_parent(find(lv_screen_active(),"Back to Orbit")),&back_area);assert(ble_area.y2<back_area.y1);
+ image("/tmp/pixora-ui-ble-source.ppm");click("Back to Orbit");
  swipe();assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
  for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
  pump(16000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));

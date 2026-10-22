@@ -15,6 +15,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_random.h"
+#include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_lcd_panel_io.h"
@@ -33,6 +34,7 @@
 #include "screen_orientation.h"
 #include "ui_memory.h"
 #include "usb_protocol.h"
+#include "ble_bridge.h"
 #include "driver/usb_serial_jtag.h"
 #include <sys/time.h>
 #include "wifi_credentials.h"
@@ -43,7 +45,8 @@
 static char ssid[33],password[65],server[257],token[129];
 static EventGroupHandle_t network;
 static QueueHandle_t wifi_commands,usb_messages;
-static atomic_bool usb_enabled,runtime_ready;
+static atomic_bool usb_enabled,ble_enabled,runtime_ready;
+static int64_t ble_signal_at;
 static char usb_nonce[33],usb_hello_proof[65];
 static uint32_t usb_sequence;
 static int64_t usb_signal_at;
@@ -88,6 +91,7 @@ static lv_obj_t *label(lv_obj_t *parent,const char *text,const lv_font_t *font,i
 }
 static bool request_wifi(const wifi_ui_command *command){return wifi_commands&&xQueueSend(wifi_commands,command,0)==pdTRUE;}
 static void request_usb(bool enabled){atomic_store(&usb_enabled,enabled&&config_valid());}
+static void request_ble(bool enabled){bool allowed=enabled&&config_valid();atomic_store(&ble_enabled,allowed);ble_bridge_enable(allowed);}
 static void request_setup(void){atomic_store(&setup_requested,true);}
 /* CST9217 retains cached points when a register read has no valid ACK. Never
  * publish those stale points: otherwise LVGL can wait forever for release. */
@@ -138,7 +142,7 @@ static void display_init(void){
     ESP_LOGI("pixora_touch","orientation requested=%u lvgl=%u swap=%u mx=%u my=%u",rotation*90,(unsigned)lv_display_get_rotation(lv_display_get_default()),cfg.touch_flags.swap_xy,cfg.touch_flags.mirror_x,cfg.touch_flags.mirror_y);
     const esp_lv_adapter_touch_callbacks_t touch_callbacks={.custom_touch_read=checked_touch_read};
     ESP_ERROR_CHECK(esp_lv_adapter_set_touch_callbacks(bsp_display_get_input_dev(),&touch_callbacks));
-    screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb);lv_timer_create(touch_poll_fallback,33,NULL);bsp_display_unlock();
+    screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb,request_ble);lv_timer_create(touch_poll_fallback,33,NULL);bsp_display_unlock();
 }
 static void draw(void){
     if(atomic_load(&setup_active))return;
@@ -404,6 +408,26 @@ static bool handle_usb(void){
     if(usb_signal_at){last.stale=true;state="MAC USB / STALE";}
     return false;
 }
+static bool handle_ble(void){
+    if(!atomic_load(&ble_enabled)){
+        if(ble_signal_at){ble_signal_at=0;if(!strncmp(state,"MAC BLE",7)){memset(&last,0,sizeof(last));fetched=false;last_from_usb=false;state="OFFLINE";}}
+        return false;
+    }
+    usb_message message;int64_t now=esp_timer_get_time();
+    if(ble_bridge_receive(&message)){
+        ble_signal_at=now;last_from_usb=true;
+        struct timeval clock={.tv_sec=message.epoch};settimeofday(&clock,NULL);
+        if(message.kind==1){last=message.quota;fetched=true;last_received=message.epoch;state=last.stale?"MAC BLE / STALE":"MAC BLE / CONNECTED";}
+        else if(message.kind==2){memset(&last,0,sizeof(last));fetched=false;state="MAC BLE / PAIR AGAIN";}
+        else{last.stale=true;state="MAC BLE / OFFLINE";}
+        ESP_LOGI("pixora","BLE accepted sequence=%" PRIu32 " kind=%d",message.sequence,message.kind);
+    }
+    if(ble_signal_at&&now-ble_signal_at<65000000){
+        if(fetched&&quota_expired(&last,time(NULL)))state="MAC BLE / STALE";
+        draw();return true;
+    }
+    return false;
+}
 static void collector(void *arg){
     while(!atomic_load(&runtime_ready))vTaskDelay(pdMS_TO_TICKS(20));
     (void)arg;int failures=0,ticks=0;int64_t next_wifi_attempt=0;
@@ -416,7 +440,7 @@ static void collector(void *arg){
             else if(command.kind==WIFI_UI_CONNECT){native_connect(&command);ticks=0;}
             memset(&command,0,sizeof(command));
         }
-        if(handle_usb()){vTaskDelay(pdMS_TO_TICKS(1000));continue;}
+        if(handle_usb()||handle_ble()){vTaskDelay(pdMS_TO_TICKS(1000));continue;}
         if(!(xEventGroupGetBits(network)&1)){
             state="WI-FI OFFLINE / CACHED";last.stale=true;draw();
             if(esp_timer_get_time()>=next_wifi_attempt){esp_wifi_connect();next_wifi_attempt=esp_timer_get_time()+15000000;failures++;}
@@ -437,6 +461,7 @@ void app_main(void){
     char hello[40];snprintf(hello,sizeof(hello),"hello %s",usb_nonce);assert(usb_digest(token,hello,strlen(hello),usb_hello_proof));
     assert(xTaskCreate(usb_reader,"pixora-usb",8192,NULL,5,NULL)==pdPASS);
     assert(xTaskCreate(collector,"pixora-poll",12288,NULL,3,NULL)==pdPASS);
+    if(config_valid())ESP_ERROR_CHECK(ble_bridge_init(token));
     pixora_ui_memory_prepare();display_init();
     ESP_ERROR_CHECK(esp_netif_init());ESP_ERROR_CHECK(esp_event_loop_create_default());network=xEventGroupCreate();esp_netif_create_default_wifi_sta();esp_netif_create_default_wifi_ap();
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();ESP_ERROR_CHECK(esp_wifi_init(&init));ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
@@ -458,5 +483,6 @@ void app_main(void){
     else if(!ssid[0]){bsp_display_lock(-1);screen_ui_open_wifi();bsp_display_unlock();}
     usb_serial_jtag_driver_config_t usb_config={.tx_buffer_size=256,.rx_buffer_size=4096};
     if(!usb_serial_jtag_is_driver_installed())ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_config));
+    ESP_LOGI("pixora","DMA capacity largest=%u free=%u",(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA|MALLOC_CAP_INTERNAL),(unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA|MALLOC_CAP_INTERNAL));
     atomic_store(&runtime_ready,true);
 }

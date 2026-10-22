@@ -73,3 +73,6 @@ Wi-Fi轮询改为每秒让出处理USB和界面，重连仍按间隔进行。未
 
 ### V0.5.1 BLE开发入口
 首批Python/C加密封包、分片接收器和只读Mac探测代码已加入，见[BLE桥接开发状态](../../docs/BLE-BRIDGE.zh-CN.md)。当前尚无GATT无线显示运行路径，实物继续使用已验收USB固件；不能把协议测试通过当作BLE完成。
+
+### V0.5.1 GATT原型
+新增独立Mac蓝牙开关（连接与数据来源页，默认关闭，保存后重启保留），NimBLE单连接、逐连接会话、应用层AES-GCM加密及签名/序号校验。Mac客户端为`clients/mac_ble_bridge.py`，依赖见`clients/requirements-ble.txt`。USB优先65秒，其次BLE，再回退Wi-Fi；ACK代表认证入队，实际来源必须看屏幕。真机无线与断连回退尚待验收，详见[BLE状态与步骤](../../docs/BLE-BRIDGE.zh-CN.md)。

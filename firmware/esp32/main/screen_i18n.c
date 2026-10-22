@@ -1,6 +1,14 @@
 #include "screen_i18n.h"
 #include <string.h>
 static const struct {const char *en,*zh;} messages[]={
+ {"Mac BLE / ON","Mac 蓝牙 / 开"},
+ {"Mac BLE / OFF","Mac 蓝牙 / 关"},
+ {"Transport / Mac BLE bridge","连接 / Mac 蓝牙桥接"},
+ {"BLE ONLINE","蓝牙 在线"},
+ {"MAC BLE / CONNECTED","MAC 蓝牙 / 已连接"},
+ {"MAC BLE / STALE","MAC 蓝牙 / 数据过期"},
+ {"MAC BLE / OFFLINE","MAC 蓝牙 / 离线"},
+ {"MAC BLE / PAIR AGAIN","MAC 蓝牙 / 重新配对"},
  {"Pixora / Settings","Pixora / 设置"},
  {"Connect Wi-Fi?","配置无线网络？"},
  {"Connection / Source","连接与数据来源"},
