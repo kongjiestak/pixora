@@ -111,6 +111,10 @@ static const struct {const char *en,*zh;} messages[]={
  {"INVALID DATA / CACHED","数据无效 / 缓存"},
  {"SERVER ERROR / CACHED","服务器错误 / 缓存"},
  {"NO QUOTA DATA","尚无额度数据"},
+ {"Open robot page","切换机器人页面"},
+ {"Working","正在工作"},{"Resting","休息中"},{"Task error","任务异常"},{"Activity unknown","任务状态未知"},
+ {"Mac local Codex","Mac 本机 Codex"},{"Waiting for task signal","等待任务信号"},
+
 };
 const char *screen_translate(bool chinese,const char *english){
  if(!chinese||!english)return english;

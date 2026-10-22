@@ -26,5 +26,8 @@ int main(void){
  // Fractional/offset collection timestamps must describe the same UTC instant.
  const char *offset="{\"schema_version\":1,\"device_id\":\"aaaaaaaaaaaaaaaaaaaaaaaa\",\"mode\":\"real\",\"providers\":[{\"provider\":\"codex\",\"status\":\"ok\",\"source\":\"codex-app-server\",\"stale\":false,\"collected_at\":\"2026-10-22T10:00:00.123456+08:00\",\"windows\":[]}]}";
  assert(quota_parse(offset,strlen(offset),NOW,&v)&&v.collected_at==NOW&&!v.stale);
+ const char *activity="{\"schema_version\":1,\"device_id\":\"aaaaaaaaaaaaaaaaaaaaaaaa\",\"mode\":\"real\",\"providers\":[],\"activity\":{\"source\":\"codex-local-events\",\"state\":\"working\",\"observed_at\":1792634400,\"expires_at\":1792634415}}";
+ assert(quota_parse(activity,strlen(activity),NOW,&v)&&v.activity.state==1&&v.activity.expires_at==NOW+15);
+ assert(quota_parse(activity,strlen(activity),NOW+16,&v)&&v.activity.state==0);
  puts("PASS: quotas, zero vs missing, restrictive weekly projection, malformed/truncated payloads, collection time/offset, future and offline expiry");
 }

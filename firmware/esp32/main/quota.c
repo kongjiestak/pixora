@@ -87,6 +87,12 @@ bool quota_parse(const char *json,size_t length,int64_t epoch,quota_view *out){
             slot->known=true;slot->remaining=remaining;slot->resets_at=timestamp(string(w,"resets_at"));
         }
     }
+    const cJSON *activity=cJSON_GetObjectItemCaseSensitive(root,"activity");
+    const char *activity_source=string(activity,"source"),*activity_state=string(activity,"state");
+    double observed=number(activity,"observed_at"),expires=number(activity,"expires_at");
+    if(activity_source&&!strcmp(activity_source,"codex-local-events")&&activity_state&&isfinite(observed)&&isfinite(expires)&&observed<=epoch+5&&observed>=epoch-15&&expires>epoch&&expires<=observed+20){
+        v.activity.state=!strcmp(activity_state,"working")?1:!strcmp(activity_state,"idle")?2:!strcmp(activity_state,"error")?3:0;v.activity.expires_at=(int64_t)expires;
+    }
     v.weather=parse_weather(root,epoch);
     v.stale=quota_expired(&v,epoch);*out=v;ok=true;
 done:cJSON_Delete(root);return ok;

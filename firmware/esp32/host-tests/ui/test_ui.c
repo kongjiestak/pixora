@@ -35,8 +35,9 @@ static void flush(lv_display_t *display,const lv_area_t *area,uint8_t *pixels){
 }
 static void image(const char *path){FILE *f=fopen(path,"wb");assert(f);fprintf(f,"P6\n480 480\n255\n");for(unsigned i=0;i<480*480;i++){uint16_t p=framebuffer[i];unsigned char rgb[]={(p>>11)*255/31,((p>>5)&63)*255/63,(p&31)*255/31};fwrite(rgb,1,3,f);}fclose(f);}
 static void pump(unsigned ms){for(unsigned i=0;i<ms;i+=10){elapsed+=10;if(elapsed%1000==0)epoch++;lv_tick_inc(10);lv_timer_handler();}}
-static lv_obj_t *find(lv_obj_t *parent,const char *value){if(lv_obj_check_type(parent,&lv_label_class)&&!strcmp(lv_label_get_text(parent),value))return parent;for(unsigned i=0;i<lv_obj_get_child_count(parent);i++){lv_obj_t *r=find(lv_obj_get_child(parent,i),value);if(r)return r;}return NULL;}
+static lv_obj_t *find(lv_obj_t *parent,const char *value){if(lv_obj_has_flag(parent,LV_OBJ_FLAG_HIDDEN))return NULL;if(lv_obj_check_type(parent,&lv_label_class)&&!strcmp(lv_label_get_text(parent),value))return parent;for(unsigned i=0;i<lv_obj_get_child_count(parent);i++){lv_obj_t *r=find(lv_obj_get_child(parent,i),value);if(r)return r;}return NULL;}
 static void click(const char *value){lv_obj_t *label=find(lv_screen_active(),value);if(!label){fprintf(stderr,"Missing control: %s\n",value);abort();}lv_obj_update_layout(lv_screen_active());lv_area_t a;lv_obj_get_coords(label,&a);point=(lv_point_t){(a.x1+a.x2)/2,(a.y1+a.y2)/2};pressed=true;pump(90);pressed=false;pump(150);}
+static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.x=250;pump(40);point.x=140;pump(40);pressed=false;pump(150);}
 static void setup(void){}
 static bool wifi(const wifi_ui_command *c){(void)c;return true;}
 static void usb(bool on){(void)on;}
@@ -50,5 +51,10 @@ int main(void){
  uint8_t lang=0;assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==1);
  lv_obj_t *colon=find(lv_screen_active(),":");assert(colon);lv_opa_t before=lv_obj_get_style_text_opa(colon,LV_PART_MAIN);pump(1000);assert(lv_obj_get_style_text_opa(colon,LV_PART_MAIN)!=before);
  click(LV_SYMBOL_SETTINGS);click("屏幕与时钟");click("语言 / 简体中文");click("Back");click("Back to Orbit");assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==0);
- puts("PASS: real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
+ quota_view fixture={.collected_at=epoch,.primary={.known=true,.remaining=84},.weekly={.known=true,.remaining=98},.activity={.state=1,.expires_at=epoch+15}};
+ screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);
+ swipe();assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
+ for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
+ pump(16000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
+ puts("PASS: cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
 }

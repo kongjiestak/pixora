@@ -84,4 +84,4 @@ The @vue/devtools-api 6.6.4 npm archive omits a root license text; its original 
 
 ### ESP32 bilingual UI font
 
-`firmware/esp32/main/pixora_cjk_18.c` is a bitmap subset derived from Noto Sans CJK SC Regular Sans2.004, © 2014–2021 Adobe, licensed under SIL OFL 1.1 rather than the application MIT license. See `firmware/esp32/fonts/README.md` and `OFL.txt`.
+`firmware/esp32/main/pixora_cjk_18.c` and `pixora_cjk_24.c` are bitmap subsets derived from Noto Sans CJK SC Regular Sans2.004, © 2014–2021 Adobe, licensed under SIL OFL 1.1 rather than the application MIT license. See `firmware/esp32/fonts/README.md` and `OFL.txt`.

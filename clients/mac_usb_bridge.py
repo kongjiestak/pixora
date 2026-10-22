@@ -87,14 +87,14 @@ def run(config, once=False):
                         raise OSError('Matching physical USB screen not present')
                     port = matches[0]
                 connection.port = port; connection.dtr = False; connection.rts = False; connection.open()
-                nonce = None; sequence = 0; due = 0; ack_deadline = None; deadline = time.monotonic() + 40
+                nonce = None; sequence = 0; due = 0; feed_due = 0; cached_feed = None; ack_deadline = None; deadline = time.monotonic() + 40
                 print('Waiting for authenticated USB screen', flush=True)
                 while True:
                     line = connection.read_until(b'\n', 2048)
                     metric = re.search(rb'pixora_ui: refresh samples=(\d+) mean_ms=(\d+) max_ms=(\d+)', line)
                     if metric:
                         print('Display refresh: samples=%s mean_ms=%s max_ms=%s' % tuple(x.decode() for x in metric.groups()), flush=True)
-                    navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+)', line)
+                    navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+ face=\d+ build_ms=\d+)', line)
                     if navigation:
                         print('Display navigation: ' + navigation[1].decode(), flush=True)
                     candidate = hello_nonce(line, config['token'])
@@ -109,9 +109,14 @@ def run(config, once=False):
                         deadline = time.monotonic() + 60
                     if nonce and time.monotonic() >= due:
                         sequence += 1
-                        payload = fetch(config)
+                        if cached_feed is None or time.monotonic() >= feed_due:
+                            cached_feed = fetch(config); feed_due = time.monotonic() + 30
+                        payload = dict(cached_feed)
+                        if config.get('activity_enabled') and 'event' not in payload and any(isinstance(p, dict) and p.get('provider') == 'codex' for p in payload.get('providers', [])):
+                            from codex_activity import observe_activity
+                            payload['activity'] = observe_activity()
                         connection.write(make_frame(payload, config['token'], nonce, int(time.time()), sequence)); connection.flush()
-                        due = time.monotonic() + 30
+                        due = time.monotonic() + (5 if config.get('activity_enabled') else 30)
                         ack_deadline = time.monotonic() + 15
                         print('Sent scoped feed' if 'event' not in payload else 'Sent ' + payload['event'] + ' status', flush=True)
                     if once and ack_deadline and time.monotonic() > ack_deadline:
