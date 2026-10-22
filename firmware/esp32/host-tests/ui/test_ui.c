@@ -1,5 +1,6 @@
 #include "lvgl.h"
 #include "screen_ui.h"
+#include "display_input.h"
 #include "screen_i18n.h"
 #include "nvs.h"
 #include <assert.h>
@@ -19,7 +20,7 @@ time_t time(time_t *out){if(out)*out=epoch;return epoch;}
 int64_t esp_timer_get_time(void){return (int64_t)elapsed*1000;}
 void esp_restart(void){abort();}
 esp_err_t bsp_display_brightness_set(int percent){assert(percent>=0&&percent<=100);return ESP_OK;}
-lv_indev_t *bsp_display_get_input_dev(void){return pointer;}
+lv_indev_t *pixora_display_get_input_dev(void){return pointer;}
 esp_err_t nvs_open(const char *name,int mode,nvs_handle_t *h){(void)name;(void)mode;*h=1;return ESP_OK;}
 void nvs_close(nvs_handle_t h){(void)h;}
 esp_err_t nvs_commit(nvs_handle_t h){(void)h;return ESP_OK;}
@@ -44,7 +45,7 @@ static void usb(bool on){(void)on;}
 static bool ble_state;
 static void ble(bool on){ble_state=on;}
 int main(void){
- setenv("TZ","UTC0",1);tzset();lv_init();lv_display_t *d=lv_display_create(480,480);static uint8_t buffer[480*40*2];lv_display_set_buffers(d,buffer,NULL,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(d,flush);
+ setenv("TZ","UTC0",1);tzset();lv_init();lv_display_t *d=lv_display_create(480,480);static uint8_t buffer[480*PIXORA_DRAW_ROWS*2];lv_display_set_buffers(d,buffer,NULL,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(d,flush);lv_display_add_event_cb(d,pixora_display_align_area,LV_EVENT_INVALIDATE_AREA,NULL);
  pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_pointer);
  nvs_set_u8(1,"ui_clock",1);screen_ui_create(setup,wifi,usb,ble);pump(500);
  assert(find(lv_screen_active(),":"));image("/tmp/pixora-ui-digital.ppm");
@@ -55,7 +56,7 @@ int main(void){
  click(LV_SYMBOL_SETTINGS);click("屏幕与时钟");click("语言 / 简体中文");click("Back");click("Back to Orbit");assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==0);
  quota_view fixture={.collected_at=epoch,.primary={.known=true,.remaining=84},.weekly={.known=true,.remaining=98},.activity={.state=1,.expires_at=epoch+15}};
  screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);
- click("S");assert(find(lv_screen_active(),"Connection / Source"));
+ click(LV_SYMBOL_SETTINGS);click("Connection / Source");assert(find(lv_screen_active(),"Connection / Source"));
  click("Mac BLE / OFF");assert(ble_state);uint8_t saved_ble=0;
  assert(nvs_get_u8(1,"ble_bridge",&saved_ble)==ESP_OK&&saved_ble==1);
  click("Mac BLE / ON");assert(!ble_state);
@@ -65,5 +66,6 @@ int main(void){
  swipe();assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
  for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
  pump(16000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
+ assert(find(lv_screen_active(),"Connection / Source"));image("/tmp/pixora-ui-visible-source-entry.ppm");
  puts("PASS: cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
 }

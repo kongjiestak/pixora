@@ -91,10 +91,19 @@ def run(config, once=False):
                 print('Waiting for authenticated USB screen', flush=True)
                 while True:
                     line = connection.read_until(b'\n', 2048)
+                    health = re.search(rb'pixora: display health (uptime_s=\d+ dma_free=\d+ dma_largest=\d+ dma_min=\d+)', line)
+                    if health:
+                        print('Display health: ' + health[1].decode(), flush=True)
+                    if b'Failed to allocate priv TX buffer' in line:
+                        print('Display driver error: DMA TX allocation', flush=True)
+                    if b'Draw bitmap failed:' in line:
+                        print('Display driver error: bitmap transfer', flush=True)
+                    if b'Guru Meditation' in line or b'assert failed' in line:
+                        print('Display device failure detected', flush=True)
                     metric = re.search(rb'pixora_ui: refresh samples=(\d+) mean_ms=(\d+) max_ms=(\d+)', line)
                     if metric:
                         print('Display refresh: samples=%s mean_ms=%s max_ms=%s' % tuple(x.decode() for x in metric.groups()), flush=True)
-                    navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+ face=\d+ build_ms=\d+)', line)
+                    navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+ face=\d+ build_ms=\d+|paint page=\d+ face=\d+ paint_ms=\d+)', line)
                     if navigation:
                         print('Display navigation: ' + navigation[1].decode(), flush=True)
                     orientation = re.search(rb'pixora_touch: (orientation requested=\d+ lvgl=\d+ swap=[01] mx=[01] my=[01]|tap raw_x=\d+ raw_y=\d+ mapped_x=\d+ mapped_y=\d+ swap=[01] mx=[01] my=[01])', line)

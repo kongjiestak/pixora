@@ -1,4 +1,5 @@
 #include "screen_ui.h"
+#include "display_input.h"
 #include "screen_i18n.h"
 #include "theme_tokens.h"
 #include "lvgl.h"
@@ -107,10 +108,11 @@ static void update_digits(const struct tm *tm,bool valid){
  snprintf(value,sizeof(value),valid?"%02d":"--",tm->tm_sec);label_value(digits[3],value);
  lv_opa_t opacity=valid&&motion&&(tm->tm_sec%2)?LV_OPA_30:LV_OPA_COVER;if(lv_obj_get_style_text_opa(digits[2],LV_PART_MAIN)!=opacity)lv_obj_set_style_text_opa(digits[2],opacity,0);
 }
+static int64_t navigation_paint_at;
 static void deferred_render(void *unused){
- int64_t started=esp_timer_get_time();(void)unused;lv_indev_t *input=bsp_display_get_input_dev();
+ int64_t started=esp_timer_get_time();(void)unused;lv_indev_t *input=pixora_display_get_input_dev();
  if(input){lv_indev_reset(input,NULL);lv_indev_wait_release(input);}
- render_pending=false;render_now();
+ navigation_paint_at=started;render_pending=false;render_now();
  if(page==0&&!warm_done){unsigned saved=face;for(unsigned i=0;i<3;i++)if(i!=saved){face=i;clock_mode=face==1;render_now();}face=saved;clock_mode=face==1;render_now();warm_done=true;}
  ESP_LOGI("pixora_ui","navigation ready page=%u face=%u build_ms=%lld",page,face,(long long)((esp_timer_get_time()-started)/1000));
 }
@@ -240,7 +242,7 @@ static void render_now(void){
  if(page>=6&&page<=9){wifi_page();return;}
  if(page){
   text(page==4?"Connect Wi-Fi?":page==5?"Connection / Source":"Pixora / Settings",&lv_font_montserrat_24,0,28,p->ink);
-  if(page==1){char value[60];snprintf(value,sizeof(value),L("Theme / %s"),L(screen_theme_names[theme]));button(value,0,94,340,3);snprintf(value,sizeof(value),L("Accent / %s"),L(screen_accent_names[accent]));button(value,0,150,340,4);button(motion?"Motion / ON":"Motion / OFF",0,206,340,5);button("Wi-Fi setup...",0,262,340,7);button("Screen / Clock",0,318,340,16);}
+  if(page==1){char value[60];snprintf(value,sizeof(value),L("Theme / %s"),L(screen_theme_names[theme]));button(value,0,94,340,3);snprintf(value,sizeof(value),L("Accent / %s"),L(screen_accent_names[accent]));button(value,0,150,340,4);button(motion?"Motion / ON":"Motion / OFF",0,206,340,5);button("Wi-Fi setup...",0,262,340,7);button("Screen / Clock",0,318,340,16);button("Connection / Source",0,374,340,9);}
   if(page==10){char value[80];snprintf(value,sizeof(value),L("Brightness / %u%%"),brightness);button(value,0,70,340,17);button(night?"Night dim / ON (22-07)":"Night dim / OFF",0,121,340,18);snprintf(value,sizeof(value),L("Rotation / %u > restart"),rotation*90);button(value,0,172,340,40);snprintf(value,sizeof(value),L("Time / UTC%+.2f"),timezone_quarters/4.0);button(value,0,223,340,41);button(face==0?"Open bedside clock":face==1?"Open robot page":"Open quota page",0,274,340,19);button("Language / English",0,325,340,43);}
   if(page==2||page==3)for(unsigned i=0;i<4;i++)button(page==2?screen_theme_names[i]:screen_accent_names[i],0,90+i*58,320,(page==2?20:30)+i);
   if(page==4){text("This pauses the status display.",&lv_font_montserrat_18,0,115,p->muted);text("Existing Wi-Fi is kept until Save.",&lv_font_montserrat_18,0,152,p->muted);button("Open phone setup",0,230,330,8);}
@@ -252,7 +254,7 @@ static void render_now(void){
    button(usb_on?"Mac USB / ON":"Mac USB / OFF",0,333,300,15);
    button(ble_on?"Mac BLE / ON":"Mac BLE / OFF",0,382,300,44);
   }
-  button(page==1||page==5?"Back to Orbit":"Back",0,page==5?431:384,280,page==1||page==5?2:page==4?42:1);return;
+  button(page==1||page==5?"Back to Orbit":"Back",0,page==5||page==1?431:384,280,page==1||page==5?2:page==4?42:1);return;
  }
  wake_layer=NULL;home_controls=NULL;
  /* Outer information band: radius 216; quota rings stay inside radius 180. */
@@ -295,6 +297,9 @@ static void refresh_measure(lv_event_t *event){
  if(lv_event_get_code(event)==LV_EVENT_REFR_START){started=esp_timer_get_time();rendered=false;return;}
  if(lv_event_get_code(event)==LV_EVENT_RENDER_START){rendered=true;return;}
  if(lv_event_get_code(event)!=LV_EVENT_REFR_READY||!started||!rendered)return;
+ if(navigation_paint_at){
+  ESP_LOGI("pixora_ui","navigation paint page=%u face=%u paint_ms=%lld",page,face,(long long)((esp_timer_get_time()-navigation_paint_at)/1000));navigation_paint_at=0;
+ }
  int64_t elapsed=esp_timer_get_time()-started;started=0;total+=elapsed;if(elapsed>maximum)maximum=elapsed;
  if(++samples==10){ESP_LOGI("pixora_ui","refresh samples=10 mean_ms=%lld max_ms=%lld",(long long)(total/10000),(long long)(maximum/1000));samples=0;total=maximum=0;}
 }
