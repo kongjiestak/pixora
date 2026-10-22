@@ -29,6 +29,7 @@
 #include "cJSON.h"
 #include "quota.h"
 #include "screen_ui.h"
+#include "ui_memory.h"
 #include "usb_protocol.h"
 #include "driver/usb_serial_jtag.h"
 #include <sys/time.h>
@@ -393,7 +394,7 @@ void app_main(void){
     char hello[40];snprintf(hello,sizeof(hello),"hello %s",usb_nonce);assert(usb_digest(token,hello,strlen(hello),usb_hello_proof));
     assert(xTaskCreate(usb_reader,"pixora-usb",8192,NULL,5,NULL)==pdPASS);
     assert(xTaskCreate(collector,"pixora-poll",12288,NULL,3,NULL)==pdPASS);
-    display_init();
+    pixora_ui_memory_prepare();display_init();
     ESP_ERROR_CHECK(esp_netif_init());ESP_ERROR_CHECK(esp_event_loop_create_default());network=xEventGroupCreate();esp_netif_create_default_wifi_sta();esp_netif_create_default_wifi_ap();
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();ESP_ERROR_CHECK(esp_wifi_init(&init));ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,wifi_event,NULL));ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,IP_EVENT_STA_GOT_IP,wifi_event,NULL));

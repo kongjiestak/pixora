@@ -72,3 +72,10 @@ Wi-Fi与Mac桥接均用同一设备令牌读取既有 `/api/v1/device` 和 `/api
 官方App Server有独立运行状态/等待标记事件，可作为后续连接器；当前适配器没有假称订阅其他桌面进程的App Server流。参考：https://learn.chatgpt.com/docs/app-server
 
 实物验收：连续往返三屏和Settings/Back；闲置后第一次滑动；中英文/主题保持；观察Mac任务完成后的休息状态和启动任务后的工作状态。构建、软件模拟、真实本地事件读取和USB ACK均不能代替这组用户验收。
+
+
+### 实物内存故障追加修复
+
+三屏首轮实物检查曾出现“界面启动但无USB握手”；后台任务改为界面预热前分配栈并检查创建结果，随后前台握手/真实帧ACK通过。串口私密诊断进一步发现 SPI `Failed to allocate priv TX buffer`，因此不能把握手通过当作刷屏正常。
+
+后续将LVGL malloc/realloc集中到PSRAM（不回退侵占内部DMA内存），驱动/任务保持内部内存。配置使用 `CONFIG_LV_USE_CUSTOM_MALLOC`，实现位于 `ui_memory.c`。必须在实物启动/切页期间检查SPI错误是否消失，并重新验收触控；主机CLIB内存模拟不能证明ESP DMA资源健康。
