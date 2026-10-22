@@ -87,6 +87,21 @@ static lv_obj_t *label(lv_obj_t *parent,const char *text,const lv_font_t *font,i
 static bool request_wifi(const wifi_ui_command *command){return wifi_commands&&xQueueSend(wifi_commands,command,0)==pdTRUE;}
 static void request_usb(bool enabled){atomic_store(&usb_enabled,enabled&&config_valid());}
 static void request_setup(void){atomic_store(&setup_requested,true);}
+/* CST9217 retains cached points when a register read has no valid ACK. Never
+ * publish those stale points: otherwise LVGL can wait forever for release. */
+static esp_err_t checked_touch_read(esp_lcd_touch_handle_t touch,
+        esp_lcd_touch_point_data_t *points,uint8_t *count,uint8_t capacity,void *context){
+    (void)context;
+    static unsigned reads,errors,presses,releases;static bool pressed;
+    *count=0;
+    esp_err_t result=esp_lcd_touch_read_data(touch);
+    if(result==ESP_OK)result=esp_lcd_touch_get_data(touch,points,count,capacity);
+    if(result!=ESP_OK){*count=0;errors++;}
+    bool next=*count>0;
+    if(next!=pressed){if(next)presses++;else releases++;pressed=next;}
+    if(++reads%300==0)ESP_LOGI("pixora_touch","touch reads=%u errors=%u presses=%u releases=%u held=%u",reads,errors,presses,releases,pressed);
+    return result;
+}
 static void touch_poll_fallback(lv_timer_t *timer){
     (void)timer;lv_indev_t *input=bsp_display_get_input_dev();if(input)esp_lv_adapter_touch_notify_interrupt(input);
 }
@@ -95,7 +110,10 @@ static void display_init(void){
     if(nvs_open("pixora",NVS_READONLY,&settings)==ESP_OK){nvs_get_u8(settings,"ui_rotation",&rotation);nvs_close(settings);}if(rotation>3)rotation=0;
     const esp_lv_adapter_rotation_t rotations[]={ESP_LV_ADAPTER_ROTATE_0,ESP_LV_ADAPTER_ROTATE_90,ESP_LV_ADAPTER_ROTATE_180,ESP_LV_ADAPTER_ROTATE_270};
     bsp_display_cfg_t cfg={.lv_adapter_cfg=ESP_LV_ADAPTER_DEFAULT_CONFIG(),.rotation=rotations[rotation],.tear_avoid_mode=ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,.touch_flags={.swap_xy=(rotation%2)==0,.mirror_x=rotation>=2,.mirror_y=rotation==0||rotation==3}};
-    bsp_display_start_with_config(&cfg);bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb);lv_timer_create(touch_poll_fallback,33,NULL);bsp_display_unlock();
+    bsp_display_start_with_config(&cfg);bsp_display_lock(-1);
+    const esp_lv_adapter_touch_callbacks_t touch_callbacks={.custom_touch_read=checked_touch_read};
+    ESP_ERROR_CHECK(esp_lv_adapter_set_touch_callbacks(bsp_display_get_input_dev(),&touch_callbacks));
+    screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb);lv_timer_create(touch_poll_fallback,33,NULL);bsp_display_unlock();
 }
 static void draw(void){
     if(atomic_load(&setup_active))return;
