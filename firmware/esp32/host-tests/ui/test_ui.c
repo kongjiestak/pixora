@@ -44,7 +44,18 @@ static unsigned cached_images(lv_obj_t *obj){
  unsigned n=0;if(lv_obj_check_type(obj,&lv_image_class)){assert(lv_image_get_src(obj));n++;}
  for(unsigned i=0;i<lv_obj_get_child_count(obj);i++)n+=cached_images(lv_obj_get_child(obj,i));return n;
 }
-static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.x=250;pump(40);point.x=140;pump(40);pressed=false;pump(400);}
+static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.x=250;pump(40);point.x=140;pump(40);pressed=false;pump(500);}
+static void moving_images(lv_obj_t *obj,lv_obj_t **images,unsigned *count){
+ if(lv_obj_has_flag(obj,LV_OBJ_FLAG_HIDDEN))return;
+ if(lv_obj_check_type(obj,&lv_image_class)&&lv_obj_get_width(obj)==480){assert(*count<2);images[(*count)++]=obj;}
+ for(unsigned i=0;i<lv_obj_get_child_count(obj);i++)moving_images(lv_obj_get_child(obj,i),images,count);
+}
+static void probe_swipe(bool left){
+ point=(lv_point_t){left?340:140,240};pressed=true;pump(60);point.x=250;pump(40);point.x=left?140:340;pump(40);pressed=false;pump(80);
+ lv_obj_t *images[2]={0};unsigned count=0;moving_images(lv_screen_active(),images,&count);assert(count==2);
+ int old_x=lv_obj_get_x(images[0]),new_x=lv_obj_get_x(images[1]);assert(left?(old_x<0&&new_x>0):(old_x>0&&new_x<0));assert(abs(old_x-new_x)==480);
+ assert(panel_brightness==60);image("/tmp/pixora-ui-slide-midpoint.ppm");pump(500);count=0;moving_images(lv_screen_active(),images,&count);assert(count==0);
+}
 static void setup(void){}
 static bool wifi(const wifi_ui_command *c){(void)c;return true;}
 static void usb(bool on){(void)on;}
@@ -60,7 +71,7 @@ int main(void){
  uint8_t lang=0;assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==1);
  lv_obj_t *colon=find(lv_screen_active(),":");assert(colon);lv_opa_t before=lv_obj_get_style_text_opa(colon,LV_PART_MAIN);pump(1000);assert(lv_obj_get_style_text_opa(colon,LV_PART_MAIN)!=before);
  click(LV_SYMBOL_SETTINGS);click("屏幕与时钟");click("语言 / 简体中文");click("Back");click("Back to Orbit");assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==0);
- quota_view fixture={.collected_at=epoch,.primary={.known=true,.remaining=84},.weekly={.known=true,.remaining=98},.activity={.state=1,.expires_at=epoch+15}};
+ quota_view fixture={.collected_at=epoch,.primary={.known=true,.remaining=84},.weekly={.known=true,.remaining=98},.activity={.state=1,.expires_at=epoch+60}};
  screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);
  click(LV_SYMBOL_SETTINGS);click("Connection / Source");assert(find(lv_screen_active(),"Connection / Source"));
  click("Mac BLE / OFF");assert(ble_state);uint8_t saved_ble=0;
@@ -69,11 +80,12 @@ int main(void){
  lv_area_t ble_area,back_area;lv_obj_get_coords(lv_obj_get_parent(find(lv_screen_active(),"Mac BLE / OFF")),&ble_area);
  lv_obj_get_coords(lv_obj_get_parent(find(lv_screen_active(),"Back to Orbit")),&back_area);assert(ble_area.y2<back_area.y1);
  image("/tmp/pixora-ui-ble-source.ppm");click("Back to Orbit");
- unsigned before_dark=dark_frames;min_brightness=60;swipe();assert(dark_frames==before_dark&&min_brightness==45&&panel_brightness==60);assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
+ unsigned before_dark=dark_frames;min_brightness=60;probe_swipe(true);assert(dark_frames==before_dark&&min_brightness==60&&panel_brightness==60);assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
+ probe_swipe(false);assert(find(lv_screen_active(),":"));probe_swipe(true);assert(find(lv_screen_active(),"Working"));
  for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
  pump(1100);uint8_t saved_face=0;assert(nvs_get_u8(1,"ui_face",&saved_face)==ESP_OK&&saved_face==2);assert(cached_images(lv_screen_active())==4);
- pump(16000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
+ pump(61000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
  assert(find(lv_screen_active(),"Connection / Source"));image("/tmp/pixora-ui-visible-source-entry.ppm");
  click("Motion / ON");click("Back to Orbit");before_dark=dark_frames;swipe();assert(dark_frames==before_dark&&panel_brightness==60);assert(find(lv_screen_active(),"CODEX"));
- puts("PASS: cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
+ puts("PASS: directional snapshot slides, constant brightness, motion off, cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
 }
