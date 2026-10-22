@@ -3,10 +3,12 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdatomic.h>
+#include <assert.h>
 #include <ctype.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "freertos/queue.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -24,12 +26,14 @@
 #include "cJSON.h"
 #include "quota.h"
 #include "screen_ui.h"
+#include "wifi_credentials.h"
 #include "setup_address.h"
 #include "setup_request.h"
 
 // Private configuration is provisioned in NVS, never built into the firmware.
 static char ssid[33],password[65],server[257],token[129];
 static EventGroupHandle_t network;
+static QueueHandle_t wifi_commands;
 static atomic_bool setup_active;
 static lv_obj_t *screen;
 static atomic_bool setup_requested;
@@ -52,15 +56,26 @@ static void load_config(void){
     n=sizeof(password);if(nvs_get_str(h,"password",password,&n)!=ESP_OK)password[0]=0;
     n=sizeof(server);if(nvs_get_str(h,"server",server,&n)!=ESP_OK)server[0]=0;
     n=sizeof(token);if(nvs_get_str(h,"token",token,&n)!=ESP_OK)token[0]=0;
-    nvs_close(h);
+    wifi_saved_credentials saved={0};n=sizeof(saved);
+    if(nvs_get_blob(h,"wifi_current",&saved,&n)==ESP_OK&&n==sizeof(saved)&&
+       memchr(saved.ssid,0,sizeof(saved.ssid))&&memchr(saved.password,0,sizeof(saved.password))&&
+       wifi_credentials_valid(saved.ssid,saved.password,saved.password[0]!=0)){
+        strcpy(ssid,saved.ssid);strcpy(password,saved.password);
+    }
+    memset(&saved,0,sizeof(saved));nvs_close(h);
     size_t length=strlen(server);if(length&&server[length-1]=='/')server[length-1]=0;
+}
+static esp_err_t store_wifi(nvs_handle_t h,const char *name,const char *secret){
+    wifi_saved_credentials saved={0};snprintf(saved.ssid,sizeof(saved.ssid),"%s",name);snprintf(saved.password,sizeof(saved.password),"%s",secret);
+    esp_err_t err=nvs_set_blob(h,"wifi_current",&saved,sizeof(saved));memset(&saved,0,sizeof(saved));return err;
 }
 static lv_obj_t *label(lv_obj_t *parent,const char *text,const lv_font_t *font,int x,int y){
     lv_obj_t *o=lv_label_create(parent);lv_label_set_text(o,text);lv_obj_set_style_text_font(o,font,0);lv_obj_set_style_text_color(o,lv_color_hex(0xdde9ee),0);lv_obj_align(o,LV_ALIGN_TOP_MID,x,y);return o;
 }
+static bool request_wifi(const wifi_ui_command *command){return wifi_commands&&xQueueSend(wifi_commands,command,0)==pdTRUE;}
 static void request_setup(void){atomic_store(&setup_requested,true);}
 static void display_init(void){
-    bsp_display_start();bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup);bsp_display_unlock();
+    bsp_display_start();bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup,request_wifi);bsp_display_unlock();
 }
 static void draw(void){
     if(atomic_load(&setup_active))return;
@@ -170,7 +185,7 @@ static esp_err_t form_save(httpd_req_t *r){
         strcpy(dest,value);mask|=bit;
     }
     if(!(mask&16)||!setup_nonce_valid(csrf,setup_nonce))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Setup page expired; reload and try again");
-    if(!next_ssid[0])return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Wi-Fi name required");
+    if(!wifi_credentials_valid(next_ssid,next_pass,next_pass[0]!=0))return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Use a 1-32 byte Wi-Fi name and 8-63 ASCII password (or 64 hex digits); leave password empty for open networks");
     // Keep secrets out of HTML and logs; empty advanced fields preserve provisioning.
     char old_server[257],old_token[129];strcpy(old_server,server);strcpy(old_token,token);
     size_t new_length=strlen(next_server);if(new_length&&next_server[new_length-1]=='/')next_server[new_length-1]=0;
@@ -180,7 +195,7 @@ static esp_err_t form_save(httpd_req_t *r){
     size_t length=strlen(server);if(length&&server[length-1]=='/')server[length-1]=0;
     if(!config_valid()){strcpy(server,old_server);strcpy(token,old_token);return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"HTTPS server and scoped display token required");}
     nvs_handle_t h;esp_err_t err=nvs_open("pixora",NVS_READWRITE,&h);
-    if(err==ESP_OK){err=nvs_set_str(h,"ssid",next_ssid);if(err==ESP_OK)err=nvs_set_str(h,"password",next_pass);if(err==ESP_OK)err=nvs_set_str(h,"server",server);if(err==ESP_OK)err=nvs_set_str(h,"token",token);if(err==ESP_OK)err=nvs_commit(h);nvs_close(h);}
+    if(err==ESP_OK){err=store_wifi(h,next_ssid,next_pass);if(err==ESP_OK)err=nvs_set_str(h,"server",server);if(err==ESP_OK)err=nvs_set_str(h,"token",token);if(err==ESP_OK)err=nvs_commit(h);nvs_close(h);}
     memset(next_pass,0,sizeof(next_pass));memset(next_token,0,sizeof(next_token));memset(body,0,sizeof(body));
     if(err!=ESP_OK)return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"Could not save");
     httpd_resp_set_type(r,"text/html; charset=utf-8");httpd_resp_set_hdr(r,"Cache-Control","no-store");
@@ -225,11 +240,61 @@ static void read_quota(void){
     }else{last.stale=true;state="NETWORK ERROR / CACHED";}
     if(body){memset(body,0,16385);free(body);}esp_http_client_cleanup(c);memset(authorization,0,sizeof(authorization));
 }
+static void native_scan(void){
+    if(!(xEventGroupGetBits(network)&1)){esp_wifi_disconnect();vTaskDelay(pdMS_TO_TICKS(150));}
+    wifi_scan_config_t config={0};config.scan_type=WIFI_SCAN_TYPE_ACTIVE;config.scan_time.active.min=40;config.scan_time.active.max=100;
+    wifi_ui_network list[WIFI_UI_LIMIT]={0};unsigned used=0;const char *message="No networks. Scan again or enter hidden SSID.";
+    if(esp_wifi_scan_start(&config,true)==ESP_OK){
+        uint16_t count=24;wifi_ap_record_t *records=calloc(count,sizeof(*records));
+        if(records&&esp_wifi_scan_get_ap_records(&count,records)==ESP_OK){
+            for(int i=0;i<count&&used<WIFI_UI_LIMIT;i++){
+                records[i].ssid[32]=0;if(!records[i].ssid[0]||!strcmp((char*)records[i].ssid,ap_name))continue;
+                bool duplicate=false;for(unsigned j=0;j<used;j++)if(!strcmp(list[j].ssid,(char*)records[i].ssid))duplicate=true;if(duplicate)continue;
+                wifi_ui_network *entry=&list[used++];strcpy(entry->ssid,(char*)records[i].ssid);entry->rssi=records[i].rssi;entry->secure=records[i].authmode!=WIFI_AUTH_OPEN;
+                wifi_auth_mode_t auth=records[i].authmode;entry->supported=auth==WIFI_AUTH_OPEN||auth==WIFI_AUTH_WPA_PSK||auth==WIFI_AUTH_WPA2_PSK||auth==WIFI_AUTH_WPA_WPA2_PSK||auth==WIFI_AUTH_WPA3_PSK||auth==WIFI_AUTH_WPA2_WPA3_PSK;
+            }
+            if(used)message="Select a network / scroll for more";
+        }else message="Scan unavailable. Please retry.";
+        free(records);esp_wifi_clear_ap_list();
+    }else message="Scan busy. Please retry in a moment.";
+    bsp_display_lock(-1);screen_ui_wifi_scan_result(list,used,message);bsp_display_unlock();
+}
+static esp_err_t set_station(const char *name,const char *secret){
+    wifi_config_t config={0};memcpy(config.sta.ssid,name,strlen(name));memcpy(config.sta.password,secret,strlen(secret));
+    // Match the selected security class without falling back from a password to open Wi-Fi.
+    config.sta.threshold.authmode=secret[0]?WIFI_AUTH_WPA_PSK:WIFI_AUTH_OPEN;
+    esp_wifi_disconnect();xEventGroupClearBits(network,1);vTaskDelay(pdMS_TO_TICKS(150));
+    esp_err_t err=esp_wifi_set_config(WIFI_IF_STA,&config);memset(&config,0,sizeof(config));
+    return err==ESP_OK?esp_wifi_connect():err;
+}
+static void native_connect(wifi_ui_command *command){
+    bool ok=false;const char *message="Invalid network/password. Previous Wi-Fi kept.";
+    if(wifi_credentials_valid(command->ssid,command->password,command->secure)){
+        state="CONNECTING NEW WI-FI";last.stale=true;
+        wifi_ap_record_t connected_ap={0};
+        if(set_station(command->ssid,command->password)==ESP_OK&&
+           (xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(18000))&1)&&
+           esp_wifi_sta_get_ap_info(&connected_ap)==ESP_OK&&!strncmp((char*)connected_ap.ssid,command->ssid,32)){
+            nvs_handle_t h;esp_err_t err=nvs_open("pixora",NVS_READWRITE,&h);
+            if(err==ESP_OK){err=store_wifi(h,command->ssid,command->password);if(err==ESP_OK)err=nvs_commit(h);nvs_close(h);}
+            if(err==ESP_OK){strcpy(ssid,command->ssid);strcpy(password,command->password);ok=true;message="Connected and saved. Return to Orbit.";state="WI-FI CONNECTED";}
+            else message="Could not save. Old settings kept; reconnecting.";
+        }else message=ssid[0]?"Connection failed. Old settings kept; reconnecting. Check password and 2.4GHz Wi-Fi.":"Connection failed. Check password and 2.4GHz Wi-Fi, then retry.";
+        if(!ok){if(ssid[0]){set_station(ssid,password);state="RESTORING PREVIOUS WI-FI";}else{esp_wifi_disconnect();state="CHECK WI-FI / SETUP";}}
+    }
+    memset(command,0,sizeof(*command));bsp_display_lock(-1);screen_ui_wifi_connect_result(ok,message);bsp_display_unlock();
+}
 static void collector(void *arg){
     (void)arg;int failures=0,ticks=0;
     while(true){
         if(atomic_exchange(&setup_requested,false))setup_start();
         if(atomic_load(&setup_active)){vTaskDelay(pdMS_TO_TICKS(1000));continue;}
+        wifi_ui_command command={0};
+        if(xQueueReceive(wifi_commands,&command,0)==pdTRUE){
+            if(command.kind==WIFI_UI_SCAN)native_scan();
+            else if(command.kind==WIFI_UI_CONNECT){native_connect(&command);ticks=0;}
+            memset(&command,0,sizeof(command));
+        }
         if(!(xEventGroupGetBits(network)&1)){
             state="WI-FI OFFLINE / CACHED";last.stale=true;draw();esp_wifi_connect();
             if(!(xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(12000))&1)){failures++;if(failures>=3){state="CHECK WI-FI / SETUP";draw();}vTaskDelay(pdMS_TO_TICKS(3000));continue;}
@@ -244,12 +309,13 @@ static void collector(void *arg){
 void app_main(void){
     setenv("TZ","UTC0",1);tzset();
     // Never erase user NVS automatically on an initialization error.
-    ESP_ERROR_CHECK(nvs_flash_init());load_config();display_init();
+    ESP_ERROR_CHECK(nvs_flash_init());load_config();wifi_commands=xQueueCreate(1,sizeof(wifi_ui_command));assert(wifi_commands);display_init();
     ESP_ERROR_CHECK(esp_netif_init());ESP_ERROR_CHECK(esp_event_loop_create_default());network=xEventGroupCreate();esp_netif_create_default_wifi_sta();esp_netif_create_default_wifi_ap();
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();ESP_ERROR_CHECK(esp_wifi_init(&init));ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,wifi_event,NULL));ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,IP_EVENT_STA_GOT_IP,wifi_event,NULL));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));wifi_config_t sta={0};memcpy(sta.sta.ssid,ssid,strlen(ssid));memcpy(sta.sta.password,password,strlen(password));ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta));ESP_ERROR_CHECK(esp_wifi_start());
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);esp_sntp_setservername(0,"pool.ntp.org");esp_sntp_init();
-    if(!ssid[0]||!config_valid())setup_start();
+    if(!config_valid())setup_start();
+    else if(!ssid[0]){bsp_display_lock(-1);screen_ui_open_wifi();bsp_display_unlock();}
     xTaskCreate(collector,"pixora-poll",12288,NULL,3,NULL);
 }

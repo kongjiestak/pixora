@@ -16,3 +16,7 @@ ${CC:-cc} -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
 ${CC:-cc} -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
   -I"$root/main" "$root/host-tests/test_setup_request.c" -o "$tmp/setup-request-test"
 "$tmp/setup-request-test"
+
+${CC:-cc} -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
+  -I"$root/main" "$root/host-tests/test_wifi_credentials.c" -o "$tmp/wifi-credentials-test"
+"$tmp/wifi-credentials-test"
