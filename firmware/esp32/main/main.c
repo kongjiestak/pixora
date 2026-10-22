@@ -118,7 +118,7 @@ static void display_init(void){
     uint8_t rotation=0;nvs_handle_t settings;
     if(nvs_open("pixora",NVS_READONLY,&settings)==ESP_OK){nvs_get_u8(settings,"ui_rotation",&rotation);nvs_close(settings);}if(rotation>3)rotation=0;
     const esp_lv_adapter_rotation_t rotations[]={ESP_LV_ADAPTER_ROTATE_0,ESP_LV_ADAPTER_ROTATE_90,ESP_LV_ADAPTER_ROTATE_180,ESP_LV_ADAPTER_ROTATE_270};
-    bsp_display_cfg_t cfg={.lv_adapter_cfg=ESP_LV_ADAPTER_DEFAULT_CONFIG(),.rotation=rotations[rotation],.tear_avoid_mode=ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,.touch_flags={.swap_xy=(rotation%2)==0,.mirror_x=rotation>=2,.mirror_y=rotation==0||rotation==3}};
+    bsp_display_cfg_t cfg={.lv_adapter_cfg=ESP_LV_ADAPTER_DEFAULT_CONFIG(),.rotation=rotations[rotation],.tear_avoid_mode=ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,.touch_flags={.swap_xy=(rotation%2)!=0,.mirror_x=rotation==1||rotation==2,.mirror_y=rotation>=2}};
     bsp_display_start_with_config(&cfg);bsp_display_lock(-1);
     const esp_lv_adapter_touch_callbacks_t touch_callbacks={.custom_touch_read=checked_touch_read};
     ESP_ERROR_CHECK(esp_lv_adapter_set_touch_callbacks(bsp_display_get_input_dev(),&touch_callbacks));
