@@ -1,10 +1,14 @@
 name: ESP32 prototype
 on:
   push:
+    branches: [main]
     paths: ['firmware/**', '.github/workflows/firmware.yml']
   pull_request:
     paths: ['firmware/**', '.github/workflows/firmware.yml']
   workflow_dispatch:
+concurrency:
+  group: esp32-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

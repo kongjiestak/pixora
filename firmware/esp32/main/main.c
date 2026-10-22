@@ -105,7 +105,7 @@ static const char form[]=
 "<details><summary>高级连接设置 / Advanced</summary><small>已配对设备可留空。New devices require a scoped display token, never an admin or collector key.</small>"
 "<label>服务地址 / HTTPS server<input name=server type=url maxlength=240 placeholder='https://your-pixora.example'></label>"
 "<label>显示令牌 / Display token<input name=token type=password maxlength=128 autocomplete=off></label></details>"
-"<button>保存并连接 / Save and connect</button></form><p>2.4 GHz Wi-Fi only. If connection fails, scan the setup code again.</p></html>";
+"<button>保存并连接 / Save and connect</button></form><p>2.4 GHz Wi-Fi only. If connection fails, tap Wi-Fi / Setup on the screen, then scan its new code.</p></html>";
 static bool ap_request(httpd_req_t *r){
     struct sockaddr_in local={0};socklen_t length=sizeof(local);
     return atomic_load(&setup_active)&&getsockname(httpd_req_to_sockfd(r),(struct sockaddr*)&local,&length)==0&&local.sin_family==AF_INET&&local.sin_addr.s_addr==inet_addr("192.168.4.1");
@@ -203,7 +203,7 @@ static void collector(void *arg){
         if(atomic_load(&setup_active)){vTaskDelay(pdMS_TO_TICKS(1000));continue;}
         if(!(xEventGroupGetBits(network)&1)){
             state="WI-FI OFFLINE / CACHED";last.stale=true;draw();esp_wifi_connect();
-            if(!(xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(12000))&1)){if(++failures>=3)setup_start();vTaskDelay(pdMS_TO_TICKS(3000));continue;}
+            if(!(xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(12000))&1)){failures++;if(failures>=3){state="CHECK WI-FI / SETUP";draw();}vTaskDelay(pdMS_TO_TICKS(3000));continue;}
             failures=0;ticks=0;
         }
         if(time(NULL)<1700000000){state="SYNCING TIME";draw();vTaskDelay(pdMS_TO_TICKS(1000));continue;}

@@ -33,6 +33,8 @@ bool quota_parse(const char *json,size_t length,int64_t epoch,quota_view *out){
     while(end<json+length&&(*end==' '||*end=='\n'||*end=='\r'||*end=='\t'))end++;
     if(end!=json+length||number(root,"schema_version")!=1)goto done;
     const char *mode=string(root,"mode");if(!mode||strcmp(mode,"real"))goto done;
+    const char *id=string(root,"device_id");if(!id||strlen(id)!=24)goto done;
+    for(int i=0;i<24;i++)if(!((id[i]>='0'&&id[i]<='9')||(id[i]>='a'&&id[i]<='f')))goto done;
     const cJSON *items=cJSON_GetObjectItemCaseSensitive(root,"providers");if(!cJSON_IsArray(items))goto done;
     const cJSON *item=NULL;int codex_count=0;
     cJSON_ArrayForEach(item,items){
