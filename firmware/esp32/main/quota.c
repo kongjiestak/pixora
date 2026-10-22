@@ -26,6 +26,38 @@ bool quota_expired(const quota_view *v,int64_t epoch){
         (v->primary.known&&v->primary.resets_at&&epoch>=v->primary.resets_at)||
         (v->weekly.known&&v->weekly.resets_at&&epoch>=v->weekly.resets_at);
 }
+static screen_weather parse_weather(const cJSON *root,int64_t epoch){
+    screen_weather w={0};
+    const cJSON *observations=cJSON_GetObjectItemCaseSensitive(root,"observations"),*ob=NULL;
+    cJSON_ArrayForEach(ob,observations){
+        const char *provider=string(ob,"provider");if(!provider||strcmp(provider,"weather"))continue;
+        w.present=true;
+        const char *source=string(ob,"source"),*mode=string(ob,"mode"),*status=string(ob,"status");
+        int64_t collected=timestamp(string(ob,"collected_at")),expires=timestamp(string(ob,"expires_at"));
+        if(!source||strcmp(source,"open-meteo")||!mode||strcmp(mode,"real")||!status||strcmp(status,"ok")||!collected||collected>epoch+60||expires<=epoch||expires<=collected)continue;
+        double temp=NAN,code=NAN,model=NAN;const cJSON *metric=NULL;
+        cJSON_ArrayForEach(metric,cJSON_GetObjectItemCaseSensitive(ob,"metrics")){
+            const char *key=string(metric,"key"),*unit=string(metric,"unit");if(!key||!unit)continue;
+            if(!strcmp(key,"weather.temperature")&&!strcmp(unit,"celsius"))temp=number(metric,"value");
+            if(!strcmp(key,"weather.code")&&!strcmp(unit,"wmo-code"))code=number(metric,"value");
+            if(!strcmp(key,"weather.model_time")&&!strcmp(unit,"unix-seconds"))model=number(metric,"value");
+        }
+        if(!isfinite(temp)||temp< -100||temp>70||!isfinite(code)||code<0||code>99||floor(code)!=code||!isfinite(model)||model>epoch+300||model<epoch-7200)continue;
+        w.known=true;w.temperature=temp;w.code=(int)code;w.expires_at=expires;
+        const cJSON *entry=cJSON_GetArrayItem(cJSON_GetObjectItemCaseSensitive(ob,"entries"),0);const char *city=string(entry,"title");
+        if(city&&strlen(city)<sizeof(w.city))snprintf(w.city,sizeof(w.city),"%s",city);
+        break;
+    }
+    return w;
+}
+bool screen_weather_parse(const char *json,size_t length,int64_t epoch,screen_weather *out){
+    if(!json||!out||!length||length>16384||memchr(json,0,length))return false;
+    const char *end=NULL;cJSON *root=cJSON_ParseWithLengthOpts(json,length,&end,false);if(!root)return false;
+    while(end<json+length&&(*end==' '||*end=='\n'||*end=='\r'||*end=='\t'))end++;
+    bool ok=end==json+length&&number(root,"schema_version")==2;
+    if(ok){*out=parse_weather(root,epoch);}
+    cJSON_Delete(root);return ok;
+}
 bool quota_parse(const char *json,size_t length,int64_t epoch,quota_view *out){
     if(!json||!out||!length||length>16384||memchr(json,0,length))return false;
     const char *end=NULL;cJSON *root=cJSON_ParseWithLengthOpts(json,length,&end,false);if(!root)return false;
@@ -55,6 +87,7 @@ bool quota_parse(const char *json,size_t length,int64_t epoch,quota_view *out){
             slot->known=true;slot->remaining=remaining;slot->resets_at=timestamp(string(w,"resets_at"));
         }
     }
+    v.weather=parse_weather(root,epoch);
     v.stale=quota_expired(&v,epoch);*out=v;ok=true;
 done:cJSON_Delete(root);return ok;
 }

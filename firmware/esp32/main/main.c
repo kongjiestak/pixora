@@ -87,7 +87,11 @@ static bool request_wifi(const wifi_ui_command *command){return wifi_commands&&x
 static void request_usb(bool enabled){atomic_store(&usb_enabled,enabled&&config_valid());}
 static void request_setup(void){atomic_store(&setup_requested,true);}
 static void display_init(void){
-    bsp_display_start();bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb);bsp_display_unlock();
+    uint8_t rotation=0;nvs_handle_t settings;
+    if(nvs_open("pixora",NVS_READONLY,&settings)==ESP_OK){nvs_get_u8(settings,"ui_rotation",&rotation);nvs_close(settings);}if(rotation>3)rotation=0;
+    const esp_lv_adapter_rotation_t rotations[]={ESP_LV_ADAPTER_ROTATE_0,ESP_LV_ADAPTER_ROTATE_90,ESP_LV_ADAPTER_ROTATE_180,ESP_LV_ADAPTER_ROTATE_270};
+    bsp_display_cfg_t cfg={.lv_adapter_cfg=ESP_LV_ADAPTER_DEFAULT_CONFIG(),.rotation=rotations[rotation],.tear_avoid_mode=ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,.touch_flags={.swap_xy=(rotation%2)==0,.mirror_x=rotation>=2,.mirror_y=rotation==0||rotation==3}};
+    bsp_display_start_with_config(&cfg);bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb);bsp_display_unlock();
 }
 static void draw(void){
     if(atomic_load(&setup_active))return;
@@ -235,6 +239,19 @@ static void setup_start(void){
     label(screen,"2. Open http://192.168.4.1",&lv_font_montserrat_18,0,389);
     label(screen,"Set 2.4 GHz Wi-Fi, then Save",&lv_font_montserrat_14,0,428);bsp_display_unlock();
 }
+static void read_weather(void){
+    char url[300],authorization[145];snprintf(url,sizeof(url),"%s/api/v2/observations",server);snprintf(authorization,sizeof(authorization),"Bearer %s",token);
+    esp_http_client_config_t cfg={.url=url,.timeout_ms=12000,.crt_bundle_attach=esp_crt_bundle_attach,.disable_auto_redirect=true,.buffer_size=2048};
+    esp_http_client_handle_t c=esp_http_client_init(&cfg);if(!c)return;
+    esp_http_client_set_header(c,"Authorization",authorization);esp_http_client_set_header(c,"Accept","application/json");
+    char *body=malloc(16385);int size=0;bool complete=false;memset(&last.weather,0,sizeof(last.weather));last.weather.present=true;
+    if(body&&esp_http_client_open(c,0)==ESP_OK){
+        esp_http_client_fetch_headers(c);int status=esp_http_client_get_status_code(c);
+        if(status==401||status==403){memset(&last,0,sizeof(last));fetched=false;state="PAIR AGAIN";}
+        else if(status==200){while(size<16385){int n=esp_http_client_read(c,body+size,16385-size);if(n<0)break;if(!n){complete=esp_http_client_is_complete_data_received(c);break;}size+=n;}if(complete)screen_weather_parse(body,size,time(NULL),&last.weather);}
+    }
+    if(body){memset(body,0,16385);free(body);}esp_http_client_cleanup(c);memset(authorization,0,sizeof(authorization));
+}
 static void read_quota(void){
     char url[300],authorization[145];snprintf(url,sizeof(url),"%s/api/v1/device",server);snprintf(authorization,sizeof(authorization),"Bearer %s",token);
     esp_http_client_config_t cfg={.url=url,.timeout_ms=12000,.crt_bundle_attach=esp_crt_bundle_attach,.disable_auto_redirect=true,.buffer_size=2048};
@@ -251,6 +268,7 @@ static void read_quota(void){
         }else{last.stale=true;state="SERVER ERROR / CACHED";}
     }else{last.stale=true;state="NETWORK ERROR / CACHED";}
     if(body){memset(body,0,16385);free(body);}esp_http_client_cleanup(c);memset(authorization,0,sizeof(authorization));
+    if(fetched&&!last.stale)read_weather();
 }
 static void native_scan(void){
     if(!(xEventGroupGetBits(network)&1)){esp_wifi_disconnect();vTaskDelay(pdMS_TO_TICKS(150));}

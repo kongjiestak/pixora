@@ -28,3 +28,8 @@ ${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -DMBEDTLS_CONFIG_FILE='"usb_mbedtls
   "$root/host-tests/test_usb_protocol.c" "$root/main/usb_protocol.c" "$root/main/quota.c" \
   "$IDF_PATH/components/json/cJSON/cJSON.c" "$mbed/library/sha256.c" "$mbed/library/platform_util.c" -lm -o "$tmp/usb-protocol-test"
 "$tmp/usb-protocol-test"
+
+${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
+  -I"$root/main" -I"$IDF_PATH/components/json/cJSON" \
+  "$root/host-tests/test_weather.c" "$root/main/quota.c" "$IDF_PATH/components/json/cJSON/cJSON.c" -lm -o "$tmp/weather-test"
+"$tmp/weather-test"

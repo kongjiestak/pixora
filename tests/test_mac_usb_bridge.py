@@ -52,3 +52,32 @@ class BridgeTests(unittest.TestCase):
             policies=[c for c in build.call_args.args if isinstance(c,urllib.request.HTTPRedirectHandler)]
             self.assertEqual(len(policies),1)
             self.assertIsNone(policies[0].redirect_request(None,None,302,'',{},'https://other.invalid'))
+
+class WeatherBridgeTests(unittest.TestCase):
+    def test_only_weather_observations_cross_usb(self):
+        class Response:
+            def __init__(self,value):self.raw=json.dumps(value).encode()
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,size):return self.raw[:size]
+        class Opener:
+            def open(self,request,**kwargs):
+                if request.full_url.endswith('/api/v1/device'):
+                    return Response({'mode':'real','device_id':'a'*24,'providers':[]})
+                return Response({'schema_version':2,'observations':[{'provider':'tasks','entries':[{'title':'private'}]},{'provider':'weather','status':'ok'}]})
+        with patch('urllib.request.build_opener',return_value=Opener()):
+            value=bridge.fetch({'server':'https://example.invalid','token':KEY,'device_id':'a'*24})
+        self.assertEqual(value['observations'],[{'provider':'weather','status':'ok'}])
+
+    def test_weather_failure_keeps_quota_and_is_not_permission_absence(self):
+        class Response:
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,size):return json.dumps({'mode':'real','device_id':'a'*24,'providers':[]}).encode()
+        class Opener:
+            def open(self,request,**kwargs):
+                if request.full_url.endswith('/api/v2/observations'):raise OSError('weather offline')
+                return Response()
+        with patch('urllib.request.build_opener',return_value=Opener()):
+            value=bridge.fetch({'server':'https://example.invalid','token':KEY,'device_id':'a'*24})
+        self.assertEqual(value['mode'],'real');self.assertEqual(value['observations'],[{'provider':'weather','status':'error'}])

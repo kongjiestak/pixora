@@ -50,6 +50,23 @@ def fetch(config):
         value = json.loads(raw)
         if value.get('mode') != 'real' or value.get('device_id') != config['device_id']:
             raise ValueError('Device scope mismatch')
+        # Same scoped token, same verified origin; never import unrelated observations.
+        request = urllib.request.Request(config['server'].rstrip('/') + '/api/v2/observations',
+            headers={'Authorization': 'Bearer ' + config['token'], 'Accept': 'application/json'})
+        value["observations"] = [{"provider": "weather", "status": "error"}]
+        try:
+            with opener.open(request, timeout=12) as response:
+                raw_weather = response.read(16385)
+            if len(raw_weather) <= 16384:
+                weather = json.loads(raw_weather)
+                if weather.get('schema_version') == 2:
+                    value['observations'] = [o for o in weather.get('observations', [])
+                        if isinstance(o, dict) and o.get('provider') == 'weather'][:1]
+        except urllib.error.HTTPError as error:
+            if error.code in (401, 403):
+                return {'event': 'revoked'}
+        except (OSError, ValueError, TypeError):
+            pass  # A weather failure must not erase otherwise valid quota data.
         return value
     except urllib.error.HTTPError as error:
         return {'event': 'revoked' if error.code in (401, 403) else 'offline'}
@@ -74,6 +91,9 @@ def run(config, once=False):
                 print('Waiting for authenticated USB screen', flush=True)
                 while True:
                     line = connection.read_until(b'\n', 2048)
+                    metric = re.search(rb'pixora_ui: refresh samples=(\d+) mean_ms=(\d+) max_ms=(\d+)', line)
+                    if metric:
+                        print('Display refresh: samples=%s mean_ms=%s max_ms=%s' % tuple(x.decode() for x in metric.groups()), flush=True)
                     candidate = hello_nonce(line, config['token'])
                     if candidate and candidate != nonce:
                         nonce = candidate; sequence = int(time.time()); due = 0
