@@ -30,6 +30,7 @@
 #include "cJSON.h"
 #include "quota.h"
 #include "screen_ui.h"
+#include "screen_orientation.h"
 #include "ui_memory.h"
 #include "usb_protocol.h"
 #include "driver/usb_serial_jtag.h"
@@ -104,10 +105,22 @@ static esp_err_t checked_touch_read(esp_lcd_touch_handle_t touch,
         esp_err_t ack=esp_lcd_panel_io_tx_param(touch->io,0xd0,acknowledge,sizeof(acknowledge));
         if(ack!=ESP_OK){ack_errors++;result=ack;}
     }
-    if(result==ESP_OK)result=esp_lcd_touch_get_data(touch,points,count,capacity);
+    if(result==ESP_OK){
+        /* This touch library mirrors as max-coordinate, not pixel-count. */
+        touch->config.x_max=BSP_LCD_H_RES-1;touch->config.y_max=BSP_LCD_V_RES-1;
+        result=esp_lcd_touch_get_data(touch,points,count,capacity);
+    }
     if(result!=ESP_OK){*count=0;errors++;}
     bool next=*count>0;
-    if(next!=pressed){if(next)presses++;else releases++;pressed=next;}
+    if(next!=pressed){
+        if(next){
+            presses++;
+            uint16_t raw_x[1]={0},raw_y[1]={0};uint8_t raw_count=0;
+            touch->get_xy(touch,raw_x,raw_y,NULL,&raw_count,1);
+            if(screen_ui_touch_diagnostics_enabled())ESP_LOGI("pixora_touch","tap raw_x=%u raw_y=%u mapped_x=%u mapped_y=%u swap=%u mx=%u my=%u",raw_x[0],raw_y[0],points[0].x,points[0].y,touch->config.flags.swap_xy,touch->config.flags.mirror_x,touch->config.flags.mirror_y);
+        }else releases++;
+        pressed=next;
+    }
     if(++reads%300==0)ESP_LOGI("pixora_touch","touch reads=%u errors=%u ack_errors=%u presses=%u releases=%u held=%u",reads,errors,ack_errors,presses,releases,pressed);
     return result;
 }
@@ -117,9 +130,12 @@ static void touch_poll_fallback(lv_timer_t *timer){
 static void display_init(void){
     uint8_t rotation=0;nvs_handle_t settings;
     if(nvs_open("pixora",NVS_READONLY,&settings)==ESP_OK){nvs_get_u8(settings,"ui_rotation",&rotation);nvs_close(settings);}if(rotation>3)rotation=0;
-    const esp_lv_adapter_rotation_t rotations[]={ESP_LV_ADAPTER_ROTATE_0,ESP_LV_ADAPTER_ROTATE_90,ESP_LV_ADAPTER_ROTATE_180,ESP_LV_ADAPTER_ROTATE_270};
-    bsp_display_cfg_t cfg={.lv_adapter_cfg=ESP_LV_ADAPTER_DEFAULT_CONFIG(),.rotation=rotations[rotation],.tear_avoid_mode=ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,.touch_flags={.swap_xy=(rotation%2)!=0,.mirror_x=rotation==1||rotation==2,.mirror_y=rotation<2}};
+    const bsp_display_rotation_t rotations[]={BSP_DISPLAY_ROTATE_0,BSP_DISPLAY_ROTATE_90,BSP_DISPLAY_ROTATE_180,BSP_DISPLAY_ROTATE_270};
+    screen_touch_flags flags=screen_touch_flags_for_rotation(rotation);
+    bsp_display_cfg_t cfg={.lv_adapter_cfg=ESP_LV_ADAPTER_DEFAULT_CONFIG(),.rotation=ESP_LV_ADAPTER_ROTATE_0,.tear_avoid_mode=ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,.touch_flags={.swap_xy=flags.swap_xy,.mirror_x=flags.mirror_x,.mirror_y=flags.mirror_y}};
     bsp_display_start_with_config(&cfg);bsp_display_lock(-1);
+    ESP_ERROR_CHECK(bsp_display_rotation_set(rotations[rotation]));
+    ESP_LOGI("pixora_touch","orientation requested=%u lvgl=%u swap=%u mx=%u my=%u",rotation*90,(unsigned)lv_display_get_rotation(lv_display_get_default()),cfg.touch_flags.swap_xy,cfg.touch_flags.mirror_x,cfg.touch_flags.mirror_y);
     const esp_lv_adapter_touch_callbacks_t touch_callbacks={.custom_touch_read=checked_touch_read};
     ESP_ERROR_CHECK(esp_lv_adapter_set_touch_callbacks(bsp_display_get_input_dev(),&touch_callbacks));
     screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb);lv_timer_create(touch_poll_fallback,33,NULL);bsp_display_unlock();

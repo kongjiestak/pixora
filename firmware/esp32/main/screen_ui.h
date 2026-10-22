@@ -8,3 +8,6 @@ void screen_ui_update(const quota_view *view,bool fetched,const char *state,int6
 void screen_ui_pause(void);
 
 void screen_ui_open_wifi(void);
+
+/* Only the non-sensitive main settings menu may emit calibration points. */
+bool screen_ui_touch_diagnostics_enabled(void);

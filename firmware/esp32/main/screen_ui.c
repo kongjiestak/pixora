@@ -372,3 +372,5 @@ void screen_ui_wifi_connect_result(bool ok,const char *message){
 }
 
 void screen_ui_open_wifi(void){page=6;begin_scan();}
+
+bool screen_ui_touch_diagnostics_enabled(void){return page==1&&!render_pending;}

@@ -97,6 +97,9 @@ def run(config, once=False):
                     navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+ face=\d+ build_ms=\d+)', line)
                     if navigation:
                         print('Display navigation: ' + navigation[1].decode(), flush=True)
+                    orientation = re.search(rb'pixora_touch: (orientation requested=\d+ lvgl=\d+ swap=[01] mx=[01] my=[01]|tap raw_x=\d+ raw_y=\d+ mapped_x=\d+ mapped_y=\d+ swap=[01] mx=[01] my=[01])', line)
+                    if orientation:
+                        print('Display calibration: ' + orientation[1].decode(), flush=True)
                     touch = re.search(rb'pixora_touch: touch (reads=\d+ errors=\d+ ack_errors=\d+ presses=\d+ releases=\d+ held=[01])', line)
                     if touch:
                         print('Display touch: ' + touch[1].decode(), flush=True)

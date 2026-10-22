@@ -33,3 +33,7 @@ ${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -fsanitize=ad
   -I"$root/main" -I"$IDF_PATH/components/json/cJSON" \
   "$root/host-tests/test_weather.c" "$root/main/quota.c" "$IDF_PATH/components/json/cJSON/cJSON.c" -lm -o "$tmp/weather-test"
 "$tmp/weather-test"
+
+${CC:-cc} -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
+  -I"$root/main" "$root/host-tests/test_orientation.c" -o "$tmp/orientation-test"
+"$tmp/orientation-test"
