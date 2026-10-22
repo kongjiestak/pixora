@@ -129,7 +129,7 @@ static void update_digits(const struct tm *tm,bool valid){
 }
 static int64_t navigation_paint_at;
 static bool transition_requested,transition_active,transition_wait_paint;
-static int transition_level;
+static int transition_level,transition_floor;
 static void deferred_render(void *unused);
 static void transition_brightness(void *unused,int32_t value){
  (void)unused;if(bsp_display_brightness_set(value)==ESP_OK)last_brightness=value;
@@ -141,7 +141,7 @@ static void transition_animate(int from,int to,unsigned duration,lv_anim_complet
 }
 static void deferred_render(void *unused){
  (void)unused;
- if(transition_requested){transition_requested=false;transition_active=true;transition_level=last_brightness>=0?last_brightness:(int)brightness;transition_animate(transition_level,0,90,transition_dark);return;}
+ if(transition_requested){transition_requested=false;transition_active=true;transition_level=last_brightness>=0?last_brightness:(int)brightness;transition_floor=transition_level*75/100;if(transition_floor<1)transition_floor=1;transition_animate(transition_level,transition_floor,70,transition_dark);return;}
  int64_t started=esp_timer_get_time();lv_indev_t *input=pixora_display_get_input_dev();
  if(input){lv_indev_reset(input,NULL);lv_indev_wait_release(input);}
  navigation_paint_at=started;render_pending=false;render_now();
@@ -333,7 +333,7 @@ static void refresh_measure(lv_event_t *event){
  if(lv_event_get_code(event)!=LV_EVENT_REFR_READY||!started||!rendered)return;
  if(navigation_paint_at){
   ESP_LOGI("pixora_ui","navigation paint page=%u face=%u paint_ms=%lld",page,face,(long long)((esp_timer_get_time()-navigation_paint_at)/1000));navigation_paint_at=0;
-  if(transition_wait_paint){transition_wait_paint=false;transition_animate(0,transition_level,170,transition_finished);}
+  if(transition_wait_paint){transition_wait_paint=false;transition_animate(transition_floor,transition_level,130,transition_finished);}
  }
  int64_t elapsed=esp_timer_get_time()-started;started=0;total+=elapsed;if(elapsed>maximum)maximum=elapsed;
  if(++samples==10){ESP_LOGI("pixora_ui","refresh samples=10 mean_ms=%lld max_ms=%lld",(long long)(total/10000),(long long)(maximum/1000));samples=0;total=maximum=0;}

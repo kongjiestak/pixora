@@ -19,8 +19,8 @@ static unsigned count;
 time_t time(time_t *out){if(out)*out=epoch;return epoch;}
 int64_t esp_timer_get_time(void){return (int64_t)elapsed*1000;}
 void esp_restart(void){abort();}
-static unsigned dark_frames;static int panel_brightness;
-esp_err_t bsp_display_brightness_set(int percent){assert(percent>=0&&percent<=100);panel_brightness=percent;if(!percent)dark_frames++;return ESP_OK;}
+static unsigned dark_frames;static int panel_brightness,min_brightness=100;
+esp_err_t bsp_display_brightness_set(int percent){assert(percent>=0&&percent<=100);panel_brightness=percent;if(percent<min_brightness)min_brightness=percent;if(!percent)dark_frames++;return ESP_OK;}
 lv_indev_t *pixora_display_get_input_dev(void){return pointer;}
 esp_err_t nvs_open(const char *name,int mode,nvs_handle_t *h){(void)name;(void)mode;*h=1;return ESP_OK;}
 void nvs_close(nvs_handle_t h){(void)h;}
@@ -69,7 +69,7 @@ int main(void){
  lv_area_t ble_area,back_area;lv_obj_get_coords(lv_obj_get_parent(find(lv_screen_active(),"Mac BLE / OFF")),&ble_area);
  lv_obj_get_coords(lv_obj_get_parent(find(lv_screen_active(),"Back to Orbit")),&back_area);assert(ble_area.y2<back_area.y1);
  image("/tmp/pixora-ui-ble-source.ppm");click("Back to Orbit");
- unsigned before_dark=dark_frames;swipe();assert(dark_frames>before_dark&&panel_brightness==60);assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
+ unsigned before_dark=dark_frames;min_brightness=60;swipe();assert(dark_frames==before_dark&&min_brightness==45&&panel_brightness==60);assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
  for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
  pump(1100);uint8_t saved_face=0;assert(nvs_get_u8(1,"ui_face",&saved_face)==ESP_OK&&saved_face==2);assert(cached_images(lv_screen_active())==4);
  pump(16000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
