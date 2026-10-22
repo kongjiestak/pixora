@@ -81,3 +81,7 @@ pip retains each distribution’s original license. certifi (MPL-2.0) is install
 Original npm runtime copyright/license texts are included in [docs/licenses/npm-runtime.txt](docs/licenses/npm-runtime.txt) for redistribution of the compiled web app. Platform-specific optional Rollup/esbuild binaries are MIT and retain their licenses in the installed packages. No third-party trademark rights are implied.
 
 The @vue/devtools-api 6.6.4 npm archive omits a root license text; its original MIT notice was retrieved from the [tagged upstream source](https://github.com/vuejs/vue-devtools/blob/v6.6.4/LICENSE) and preserved with the other runtime notices.
+
+### ESP32 bilingual UI font
+
+`firmware/esp32/main/pixora_cjk_18.c` and `pixora_cjk_24.c` are bitmap subsets derived from Noto Sans CJK SC Regular Sans2.004, © 2014–2021 Adobe, licensed under SIL OFL 1.1 rather than the application MIT license. See `firmware/esp32/fonts/README.md` and `OFL.txt`.

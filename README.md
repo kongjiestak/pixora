@@ -35,7 +35,7 @@ Actual running build, **Demo Data only** (not account quotas):
 | Docker Compose | Provided; current validation is recorded in [verification](docs/VERIFICATION.md) |
 | Linux system monitoring | Real host CPU/memory/root-disk, private widget and bounded history; [V0.2](docs/V0.2.md) |
 | Developer / personal information | Public GitHub Actions/repository, RSS/Atom and read-only local JSON tasks; [V0.3](docs/V0.3.md). Local month calendar and configured city weather implemented; task editor/account sync remain planned |
-| Controls / ESP32 | Roadmap; no hardware firmware or simulator in this revision |
+| Controls / ESP32 | ESP32-S3 first-screen prototype builds; hardware acceptance pending. No automation controls; [prototype](firmware/esp32/README.md) |
 
 ## Run on your Mac or Linux computer
 

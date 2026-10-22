@@ -1,0 +1,60 @@
+#include "lvgl.h"
+#include "screen_ui.h"
+#include "screen_i18n.h"
+#include "nvs.h"
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+static time_t epoch=1792679400;
+static unsigned elapsed;
+static lv_indev_t *pointer;
+static uint16_t framebuffer[480*480];
+static bool pressed;
+static lv_point_t point;
+static struct {char key[24];int32_t value;} storage[24];
+static unsigned count;
+time_t time(time_t *out){if(out)*out=epoch;return epoch;}
+int64_t esp_timer_get_time(void){return (int64_t)elapsed*1000;}
+void esp_restart(void){abort();}
+esp_err_t bsp_display_brightness_set(int percent){assert(percent>=0&&percent<=100);return ESP_OK;}
+lv_indev_t *bsp_display_get_input_dev(void){return pointer;}
+esp_err_t nvs_open(const char *name,int mode,nvs_handle_t *h){(void)name;(void)mode;*h=1;return ESP_OK;}
+void nvs_close(nvs_handle_t h){(void)h;}
+esp_err_t nvs_commit(nvs_handle_t h){(void)h;return ESP_OK;}
+esp_err_t nvs_set_i32(nvs_handle_t h,const char *key,int32_t value){(void)h;unsigned i=0;for(;i<count;i++)if(!strcmp(storage[i].key,key))break;if(i==count){assert(count<24);strcpy(storage[count++].key,key);}storage[i].value=value;return ESP_OK;}
+esp_err_t nvs_get_i32(nvs_handle_t h,const char *key,int32_t *value){(void)h;for(unsigned i=0;i<count;i++)if(!strcmp(storage[i].key,key)){*value=storage[i].value;return ESP_OK;}return -1;}
+esp_err_t nvs_set_u8(nvs_handle_t h,const char *key,uint8_t value){return nvs_set_i32(h,key,value);}
+esp_err_t nvs_get_u8(nvs_handle_t h,const char *key,uint8_t *value){int32_t v;int e=nvs_get_i32(h,key,&v);if(!e)*value=v;return e;}
+static void read_pointer(lv_indev_t *input,lv_indev_data_t *data){(void)input;data->point=point;data->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
+static void flush(lv_display_t *display,const lv_area_t *area,uint8_t *pixels){
+ const uint16_t *source=(const uint16_t*)pixels;int width=area->x2-area->x1+1;
+ for(int y=area->y1;y<=area->y2;y++)for(int x=area->x1;x<=area->x2;x++)framebuffer[y*480+x]=source[(y-area->y1)*width+x-area->x1];
+ lv_display_flush_ready(display);
+}
+static void image(const char *path){FILE *f=fopen(path,"wb");assert(f);fprintf(f,"P6\n480 480\n255\n");for(unsigned i=0;i<480*480;i++){uint16_t p=framebuffer[i];unsigned char rgb[]={(p>>11)*255/31,((p>>5)&63)*255/63,(p&31)*255/31};fwrite(rgb,1,3,f);}fclose(f);}
+static void pump(unsigned ms){for(unsigned i=0;i<ms;i+=10){elapsed+=10;if(elapsed%1000==0)epoch++;lv_tick_inc(10);lv_timer_handler();}}
+static lv_obj_t *find(lv_obj_t *parent,const char *value){if(lv_obj_has_flag(parent,LV_OBJ_FLAG_HIDDEN))return NULL;if(lv_obj_check_type(parent,&lv_label_class)&&!strcmp(lv_label_get_text(parent),value))return parent;for(unsigned i=0;i<lv_obj_get_child_count(parent);i++){lv_obj_t *r=find(lv_obj_get_child(parent,i),value);if(r)return r;}return NULL;}
+static void click(const char *value){lv_obj_t *label=find(lv_screen_active(),value);if(!label){fprintf(stderr,"Missing control: %s\n",value);abort();}lv_obj_update_layout(lv_screen_active());lv_area_t a;lv_obj_get_coords(label,&a);point=(lv_point_t){(a.x1+a.x2)/2,(a.y1+a.y2)/2};pressed=true;pump(90);pressed=false;pump(150);}
+static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.x=250;pump(40);point.x=140;pump(40);pressed=false;pump(150);}
+static void setup(void){}
+static bool wifi(const wifi_ui_command *c){(void)c;return true;}
+static void usb(bool on){(void)on;}
+int main(void){
+ setenv("TZ","UTC0",1);tzset();lv_init();lv_display_t *d=lv_display_create(480,480);static uint8_t buffer[480*40*2];lv_display_set_buffers(d,buffer,NULL,sizeof(buffer),LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(d,flush);
+ pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_pointer);
+ nvs_set_u8(1,"ui_clock",1);screen_ui_create(setup,wifi,usb);pump(500);
+ assert(find(lv_screen_active(),":"));image("/tmp/pixora-ui-digital.ppm");
+ for(unsigned i=0;i<4;i++){click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));click(i?"Theme / paper":"Theme / orbit");click("paper");assert(find(lv_screen_active(),"Theme / paper"));click("Back to Orbit");assert(find(lv_screen_active(),":"));}
+ click(LV_SYMBOL_SETTINGS);click("Screen / Clock");click("Language / English");assert(find(lv_screen_active(),"语言 / 简体中文"));image("/tmp/pixora-ui-zh-settings.ppm");click("返回");click("返回显示");assert(find(lv_screen_active(),"秒"));
+ uint8_t lang=0;assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==1);
+ lv_obj_t *colon=find(lv_screen_active(),":");assert(colon);lv_opa_t before=lv_obj_get_style_text_opa(colon,LV_PART_MAIN);pump(1000);assert(lv_obj_get_style_text_opa(colon,LV_PART_MAIN)!=before);
+ click(LV_SYMBOL_SETTINGS);click("屏幕与时钟");click("语言 / 简体中文");click("Back");click("Back to Orbit");assert(nvs_get_u8(1,"ui_lang",&lang)==ESP_OK&&lang==0);
+ quota_view fixture={.collected_at=epoch,.primary={.known=true,.remaining=84},.weekly={.known=true,.remaining=98},.activity={.state=1,.expires_at=epoch+15}};
+ screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);
+ swipe();assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
+ for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
+ pump(16000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
+ puts("PASS: cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
+}

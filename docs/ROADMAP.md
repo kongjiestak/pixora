@@ -1,3 +1,5 @@
+> Current direction / 当前方向（2026-10-22）：V0.4 owner accepted; V0.5 first ESP32 + phone onboarding; V0.6 activity/minimal alerts + Watch 8 notification trial; V0.7 novice usability; V1.0 stable delivery. Old personal-information expansion is cancelled. See [V0.5](V0.5.md) / [中文](V0.5.zh-CN.md). Older milestone rows below are historical context, not the current plan.
+
 # Pixora roadmap
 
 [English](ROADMAP.md) | [简体中文](ROADMAP.zh-CN.md)

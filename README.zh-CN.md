@@ -34,7 +34,7 @@
 | Docker Compose | 配置已提供，实测范围见[验证报告](docs/VERIFICATION.md) |
 | Linux 系统监控 | 真实宿主机 CPU/内存/根磁盘、私密 Widget 与有限历史，见 [V0.2](docs/V0.2.md) |
 | 开发者 / 个人信息 | GitHub 公开状态、RSS/Atom、本地 JSON 只读待办已实现；[V0.3](docs/V0.3.md)。本地月历/城市天气已实现，日历账号同步/待办编辑仍待办 |
-| 控制 / ESP32 | 后续规划，本轮无硬件固件或模拟器 |
+| 控制 / ESP32 | ESP32-S3首屏原型已可构建，待真机验收；无自动化控制，见[原型说明](firmware/esp32/README.zh-CN.md) |
 
 ## 本机运行
 
