@@ -50,3 +50,9 @@ Restore only the matching unit, with its original full dump and original flash p
 Physical display/touch, phone setup, actual certificate validation, authenticated read, phone/hardware same-sample quota equality, revocation clearing, Wi-Fi loss/recovery, cold boot, server restart, Mac off with home collector on and 24-hour stability must each be recorded. Public CI/build success or chip identification does not satisfy that gate. No stable Release is created.
 
 See [third-party notices](THIRD_PARTY.md) and [V0.5 scope](../../docs/V0.5.md).
+
+## Orbit screen and setup confirmation
+
+The native screen uses concentric rings and the four named themes/accents generated directly from `web/src/themes.js`. Verify parity with `node firmware/esp32/tools/generate_themes.mjs --check`. Aurora uses a static embedded gradient. Tap the center to change the focused quota window; tap connection status for provenance. Theme, accent, motion and focus are saved locally in NVS; phone-local preferences and server recommended profiles are not synchronized yet.
+
+Quota transitions take 900ms. A 30-second satellite indicates polling rhythm only and stops on stale/offline/error states or when motion is disabled. Settings → Wi-Fi setup → confirmation replaces the immediate setup button. Ordinary settings keep polling active; network changes run outside the touch callback. Upgrade an already provisioned device by writing only its application partition, preserving private NVS. Multiple saved networks, BOOT shortcuts and Mac BLE bridging remain pending.

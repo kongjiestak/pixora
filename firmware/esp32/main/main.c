@@ -23,6 +23,7 @@
 #include "bsp/esp-bsp.h"
 #include "cJSON.h"
 #include "quota.h"
+#include "screen_ui.h"
 #include "setup_address.h"
 #include "setup_request.h"
 
@@ -30,7 +31,8 @@
 static char ssid[33],password[65],server[257],token[129];
 static EventGroupHandle_t network;
 static atomic_bool setup_active;
-static lv_obj_t *status_label,*age_label,*percent[2],*arcs[2],*reset[2],*screen;
+static lv_obj_t *screen;
+static atomic_bool setup_requested;
 static quota_view last;
 static bool fetched;
 static const char *state="CONNECTING";
@@ -56,44 +58,13 @@ static void load_config(void){
 static lv_obj_t *label(lv_obj_t *parent,const char *text,const lv_font_t *font,int x,int y){
     lv_obj_t *o=lv_label_create(parent);lv_label_set_text(o,text);lv_obj_set_style_text_font(o,font,0);lv_obj_set_style_text_color(o,lv_color_hex(0xdde9ee),0);lv_obj_align(o,LV_ALIGN_TOP_MID,x,y);return o;
 }
-static void settings_event(lv_event_t *e){(void)e;setup_start();}
+static void request_setup(void){atomic_store(&setup_requested,true);}
 static void display_init(void){
-    bsp_display_start();bsp_display_lock(-1);screen=lv_screen_active();lv_obj_set_style_bg_color(screen,lv_color_hex(0x071116),0);
-    lv_obj_remove_flag(screen,LV_OBJ_FLAG_SCROLLABLE);
-    label(screen,"Pixora",&lv_font_montserrat_24,0,20);
-    label(screen,"CODEX",&lv_font_montserrat_32,0,67);
-    status_label=label(screen,"CONNECTING",&lv_font_montserrat_18,0,114);
-    for(int i=0;i<2;i++){
-        int x=i?111:-111;
-        arcs[i]=lv_arc_create(screen);lv_obj_set_size(arcs[i],186,186);lv_obj_align(arcs[i],LV_ALIGN_TOP_MID,x,174);
-        lv_arc_set_range(arcs[i],0,100);lv_arc_set_rotation(arcs[i],270);lv_arc_set_bg_angles(arcs[i],0,360);
-        lv_arc_set_value(arcs[i],0);lv_obj_remove_style(arcs[i],NULL,LV_PART_KNOB);lv_obj_remove_flag(arcs[i],LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_arc_width(arcs[i],9,LV_PART_MAIN);lv_obj_set_style_arc_width(arcs[i],9,LV_PART_INDICATOR);
-        lv_obj_set_style_arc_color(arcs[i],lv_color_hex(0x253a46),LV_PART_MAIN);
-        label(screen,i?"LONG WINDOW":"SHORT WINDOW",&lv_font_montserrat_14,x,151);
-        percent[i]=label(screen,"--",&lv_font_montserrat_48,x,230);
-        label(screen,"remaining",&lv_font_montserrat_14,x,291);
-        reset[i]=label(screen,"Reset --",&lv_font_montserrat_14,x,361);
-    }
-    age_label=label(screen,"No collected data",&lv_font_montserrat_14,0,382);
-    lv_obj_t *button=lv_button_create(screen);lv_obj_set_size(button,170,42);lv_obj_align(button,LV_ALIGN_BOTTOM_MID,0,-14);
-    lv_obj_add_event_cb(button,settings_event,LV_EVENT_CLICKED,NULL);label(button,"Wi-Fi / Setup",&lv_font_montserrat_14,0,10);
-    bsp_display_unlock();
+    bsp_display_start();bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup);bsp_display_unlock();
 }
 static void draw(void){
     if(atomic_load(&setup_active))return;
-    time_t epoch=time(NULL);bool stale=!fetched||quota_expired(&last,epoch);
-    bsp_display_lock(-1);if(atomic_load(&setup_active)){bsp_display_unlock();return;}lv_label_set_text(status_label,state);
-    lv_color_t color=lv_color_hex(stale?0xe5bd70:0x7ee2c0);
-    lv_obj_set_style_text_color(status_label,color,0);
-    quota_window *slots[2]={&last.primary,&last.weekly};
-    for(int i=0;i<2;i++){
-        char text[16];if(slots[i]->known)snprintf(text,sizeof(text),"%d%%",(int)(slots[i]->remaining+0.5));else strcpy(text,"--");
-        lv_label_set_text(percent[i],text);
-        char countdown[40];if(slots[i]->known&&slots[i]->resets_at){long long minutes=(slots[i]->resets_at-epoch+59)/60;if(minutes<0)minutes=0;if(minutes>=1440)snprintf(countdown,sizeof(countdown),"Reset %lldd %lldh",minutes/1440,(minutes%1440)/60);else snprintf(countdown,sizeof(countdown),"Reset %lldh %lldm",minutes/60,minutes%60);}else strcpy(countdown,"Reset --");lv_label_set_text(reset[i],countdown);lv_arc_set_value(arcs[i],slots[i]->known?(int)(slots[i]->remaining+0.5):0);lv_obj_set_style_arc_color(arcs[i],color,LV_PART_INDICATOR);
-    }
-    char text[100];if(last.collected_at&&epoch>=last.collected_at)snprintf(text,sizeof(text),"Collected %lld min ago%s",(long long)((epoch-last.collected_at)/60),stale?" - STALE":"");else strcpy(text,"No collected data");
-    lv_label_set_text(age_label,text);bsp_display_unlock();
+    bsp_display_lock(-1);if(!atomic_load(&setup_active))screen_ui_update(&last,fetched,state,last_received);bsp_display_unlock();
 }
 static void wifi_event(void *arg,esp_event_base_t base,int32_t id,void *data){
     (void)arg;(void)data;
@@ -228,7 +199,7 @@ static void setup_start(void){
     httpd_uri_t get={.uri="/",.method=HTTP_GET,.handler=form_get},post={.uri="/save",.method=HTTP_POST,.handler=form_save};httpd_register_uri_handler(http,&get);httpd_register_uri_handler(http,&post);
     httpd_uri_t js={.uri="/setup.js",.method=HTTP_GET,.handler=script_get},scan={.uri="/networks",.method=HTTP_GET,.handler=networks_get};
     httpd_register_uri_handler(http,&js);httpd_register_uri_handler(http,&scan);
-    bsp_display_lock(-1);lv_obj_clean(screen);
+    bsp_display_lock(-1);screen_ui_pause();lv_obj_clean(screen);
     label(screen,"Pixora Setup",&lv_font_montserrat_24,0,15);
     label(screen,"1. Scan to join device Wi-Fi",&lv_font_montserrat_18,0,57);
     lv_obj_t *qr=lv_qrcode_create(screen);lv_qrcode_set_size(qr,210);lv_qrcode_set_dark_color(qr,lv_color_black());lv_qrcode_set_light_color(qr,lv_color_white());lv_obj_align(qr,LV_ALIGN_TOP_MID,0,92);
@@ -257,6 +228,7 @@ static void read_quota(void){
 static void collector(void *arg){
     (void)arg;int failures=0,ticks=0;
     while(true){
+        if(atomic_exchange(&setup_requested,false))setup_start();
         if(atomic_load(&setup_active)){vTaskDelay(pdMS_TO_TICKS(1000));continue;}
         if(!(xEventGroupGetBits(network)&1)){
             state="WI-FI OFFLINE / CACHED";last.stale=true;draw();esp_wifi_connect();

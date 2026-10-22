@@ -2,9 +2,9 @@ name: ESP32 prototype
 on:
   push:
     branches: [main]
-    paths: ['firmware/**', '.github/workflows/firmware.yml']
+    paths: ['firmware/**', 'web/src/themes.js', 'web/src/layout-profile.js', '.github/workflows/firmware.yml']
   pull_request:
-    paths: ['firmware/**', '.github/workflows/firmware.yml']
+    paths: ['firmware/**', 'web/src/themes.js', 'web/src/layout-profile.js', '.github/workflows/firmware.yml']
   workflow_dispatch:
 concurrency:
   group: esp32-${{ github.event.pull_request.number || github.ref }}
@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Check shared web and screen theme tokens
+        run: node firmware/esp32/tools/generate_themes.mjs --check
       - name: Build first-screen prototype and test quota semantics
         uses: espressif/esp-idf-ci-action@v1
         with:
