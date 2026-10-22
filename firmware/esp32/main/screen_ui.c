@@ -9,6 +9,8 @@
 static lv_obj_t *root,*rings[2],*center,*caption,*status,*detail,*legends[2],*satellite;
 static lv_timer_t *timer;
 static quota_view snapshot;
+static bool usb_source,usb_on;
+static void (*usb_callback)(bool);
 static bool has_data,paused,motion=true,settings_saved=true;
 static unsigned theme,accent,focus,page;
 static int64_t received;
@@ -28,7 +30,7 @@ static const screen_palette *palette(void){return &screen_palettes[theme][accent
 static void render(void);
 static void persist(void){
  nvs_handle_t h;esp_err_t e=nvs_open("pixora",NVS_READWRITE,&h);
- if(e==ESP_OK){e=nvs_set_u8(h,"ui_theme",theme);if(e==ESP_OK)e=nvs_set_u8(h,"ui_accent",accent);if(e==ESP_OK)e=nvs_set_u8(h,"ui_motion",motion);if(e==ESP_OK)e=nvs_set_u8(h,"ui_focus",focus);if(e==ESP_OK)e=nvs_commit(h);nvs_close(h);}settings_saved=e==ESP_OK;
+ if(e==ESP_OK){e=nvs_set_u8(h,"ui_theme",theme);if(e==ESP_OK)e=nvs_set_u8(h,"ui_accent",accent);if(e==ESP_OK)e=nvs_set_u8(h,"ui_motion",motion);if(e==ESP_OK)e=nvs_set_u8(h,"ui_focus",focus);if(e==ESP_OK)e=nvs_set_u8(h,"usb_bridge",usb_on);if(e==ESP_OK)e=nvs_commit(h);nvs_close(h);}settings_saved=e==ESP_OK;
 }
 static lv_obj_t *text(const char *value,const lv_font_t *font,int x,int y,uint32_t color){
  lv_obj_t *o=lv_label_create(root);lv_label_set_text(o,value);lv_obj_set_style_text_font(o,font,0);lv_obj_set_style_text_color(o,lv_color_hex(color),0);lv_obj_align(o,LV_ALIGN_TOP_MID,x,y);return o;
@@ -47,6 +49,7 @@ static void action(lv_event_t *event){
   unsigned i=id-100;if(!wifi_rows[i].supported)return;strcpy(chosen_ssid,wifi_rows[i].ssid);chosen_secure=wifi_rows[i].secure;page=7;wifi_message[0]=0;
  }
  else if(id==9)page=5;
+ else if(id==15){usb_on=!usb_on;persist();if(usb_callback)usb_callback(usb_on);}
  else if(id==8){paused=true;if(setup_callback)setup_callback();return;}
  else if(id>=20&&id<24){theme=id-20;persist();page=1;}
  else if(id>=30&&id<34){accent=id-30;persist();page=1;}
@@ -78,7 +81,7 @@ static void update_home(void){
 }
 static void tick(lv_timer_t *t){
  (void)t;if(paused||page)return;
- bool healthy=has_data&&!quota_expired(&snapshot,time(NULL))&&!strcmp(connection,"CONNECTED");
+ bool healthy=has_data&&!quota_expired(&snapshot,time(NULL))&&(!strcmp(connection,"CONNECTED")||!strcmp(connection,"MAC USB / CONNECTED"));
  if(motion&&healthy){uint32_t elapsed=lv_tick_get()-cycle_started;int angle=(elapsed%30000)*360/30000;lv_arc_set_angles(satellite,angle,angle+2);lv_obj_remove_flag(satellite,LV_OBJ_FLAG_HIDDEN);}else lv_obj_add_flag(satellite,LV_OBJ_FLAG_HIDDEN);
 }
 static void render(void){
@@ -91,12 +94,13 @@ static void render(void){
   if(page==2||page==3)for(unsigned i=0;i<4;i++)button(page==2?screen_theme_names[i]:screen_accent_names[i],0,90+i*58,320,(page==2?20:30)+i);
   if(page==4){text("This pauses the status display.",&lv_font_montserrat_18,0,115,p->muted);text("Existing Wi-Fi is kept until Save.",&lv_font_montserrat_18,0,152,p->muted);button("Open phone setup",0,230,330,8);}
   if(page==5){
-   text(connection,&lv_font_montserrat_18,0,94,p->ink);text("Transport / Wi-Fi + HTTPS",&lv_font_montserrat_18,0,144,p->muted);text("Source / Codex App Server",&lv_font_montserrat_18,0,184,p->muted);
+   text(connection,&lv_font_montserrat_18,0,94,p->ink);text(usb_source?"Transport / Mac USB bridge":"Transport / Wi-Fi + HTTPS",&lv_font_montserrat_18,0,144,p->muted);text("Source / Codex App Server",&lv_font_montserrat_18,0,184,p->muted);
    char stamp[60];time_t collected=snapshot.collected_at;struct tm utc;
    if(collected&&gmtime_r(&collected,&utc))strftime(stamp,sizeof(stamp),"Collected / %m-%d %H:%M UTC",&utc);else strcpy(stamp,"No collected data");text(stamp,&lv_font_montserrat_18,0,224,p->muted);
    text("Motion indicates poll rhythm only.",&lv_font_montserrat_14,0,284,p->muted);text("It does not mean AI is running.",&lv_font_montserrat_14,0,310,p->muted);
+   button(usb_on?"Mac USB / ON":"Mac USB / OFF",0,333,300,15);
   }
-  button(page==1||page==5?"Back to Orbit":"Back",0,384,280,page==1||page==5?2:1);return;
+  button(page==1||page==5?"Back to Orbit":"Back",0,page==5?397:384,280,page==1||page==5?2:1);return;
  }
  text("Pixora",&lv_font_montserrat_24,-132,20,p->ink);button("Settings",143,14,110,1);
  status=text(connection,&lv_font_montserrat_14,0,65,p->muted);lv_obj_add_flag(status,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_ext_click_area(status,12);lv_obj_add_event_cb(status,action,LV_EVENT_CLICKED,(void*)9);
@@ -111,12 +115,14 @@ static void render(void){
  legends[0]=text("SHORT --",&lv_font_montserrat_18,-102,435,p->accent);legends[1]=text("LONG --",&lv_font_montserrat_18,102,435,p->secondary);
  update_home();
 }
-void screen_ui_create(void (*request_setup)(void),bool (*request_wifi)(const wifi_ui_command *)){
- setup_callback=request_setup;wifi_callback=request_wifi;wifi_font=lv_font_montserrat_18;wifi_font.fallback=&lv_font_simsun_16_cjk;root=lv_screen_active();paused=false;page=0;
- nvs_handle_t h;if(nvs_open("pixora",NVS_READONLY,&h)==ESP_OK){uint8_t v;if(nvs_get_u8(h,"ui_theme",&v)==ESP_OK&&v<4)theme=v;if(nvs_get_u8(h,"ui_accent",&v)==ESP_OK&&v<4)accent=v;if(nvs_get_u8(h,"ui_motion",&v)==ESP_OK)motion=!!v;if(nvs_get_u8(h,"ui_focus",&v)==ESP_OK&&v<2)focus=v;nvs_close(h);}
+void screen_ui_create(void (*request_setup)(void),bool (*request_wifi)(const wifi_ui_command *),void (*request_usb)(bool)){
+ setup_callback=request_setup;wifi_callback=request_wifi;usb_callback=request_usb;wifi_font=lv_font_montserrat_18;wifi_font.fallback=&lv_font_simsun_16_cjk;root=lv_screen_active();paused=false;page=0;
+ nvs_handle_t h;if(nvs_open("pixora",NVS_READONLY,&h)==ESP_OK){uint8_t v;if(nvs_get_u8(h,"ui_theme",&v)==ESP_OK&&v<4)theme=v;if(nvs_get_u8(h,"ui_accent",&v)==ESP_OK&&v<4)accent=v;if(nvs_get_u8(h,"ui_motion",&v)==ESP_OK)motion=!!v;if(nvs_get_u8(h,"ui_focus",&v)==ESP_OK&&v<2)focus=v;if(nvs_get_u8(h,"usb_bridge",&v)==ESP_OK)usb_on=!!v;nvs_close(h);}
+ if(usb_callback){usb_callback(usb_on);}
  render();if(!timer)timer=lv_timer_create(tick,100,NULL);
 }
-void screen_ui_update(const quota_view *view,bool fetched,const char *state,int64_t latest){
+void screen_ui_update(const quota_view *view,bool fetched,const char *state,int64_t latest,bool from_usb){
+ usb_source=from_usb;
  if(latest!=received){received=latest;cycle_started=lv_tick_get();}snapshot=*view;has_data=fetched;snprintf(connection,sizeof(connection),"%s",state);update_home();
 }
 void screen_ui_pause(void){paused=true;lv_anim_delete_all();}

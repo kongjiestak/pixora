@@ -4,6 +4,8 @@
 #include <time.h>
 #include <stdatomic.h>
 #include <assert.h>
+#include <inttypes.h>
+#include "esp_timer.h"
 #include <ctype.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -27,6 +29,9 @@
 #include "cJSON.h"
 #include "quota.h"
 #include "screen_ui.h"
+#include "usb_protocol.h"
+#include "driver/usb_serial_jtag.h"
+#include <sys/time.h>
 #include "wifi_credentials.h"
 #include "setup_address.h"
 #include "setup_request.h"
@@ -34,7 +39,12 @@
 // Private configuration is provisioned in NVS, never built into the firmware.
 static char ssid[33],password[65],server[257],token[129];
 static EventGroupHandle_t network;
-static QueueHandle_t wifi_commands;
+static QueueHandle_t wifi_commands,usb_messages;
+static atomic_bool usb_enabled;
+static char usb_nonce[33],usb_hello_proof[65];
+static uint32_t usb_sequence;
+static int64_t usb_signal_at;
+static bool last_from_usb;
 static atomic_bool setup_active;
 static lv_obj_t *screen;
 static atomic_bool setup_requested;
@@ -74,13 +84,14 @@ static lv_obj_t *label(lv_obj_t *parent,const char *text,const lv_font_t *font,i
     lv_obj_t *o=lv_label_create(parent);lv_label_set_text(o,text);lv_obj_set_style_text_font(o,font,0);lv_obj_set_style_text_color(o,lv_color_hex(0xdde9ee),0);lv_obj_align(o,LV_ALIGN_TOP_MID,x,y);return o;
 }
 static bool request_wifi(const wifi_ui_command *command){return wifi_commands&&xQueueSend(wifi_commands,command,0)==pdTRUE;}
+static void request_usb(bool enabled){atomic_store(&usb_enabled,enabled&&config_valid());}
 static void request_setup(void){atomic_store(&setup_requested,true);}
 static void display_init(void){
-    bsp_display_start();bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup,request_wifi);bsp_display_unlock();
+    bsp_display_start();bsp_display_lock(-1);screen=lv_screen_active();screen_ui_create(request_setup,request_wifi,request_usb);bsp_display_unlock();
 }
 static void draw(void){
     if(atomic_load(&setup_active))return;
-    bsp_display_lock(-1);if(!atomic_load(&setup_active))screen_ui_update(&last,fetched,state,last_received);bsp_display_unlock();
+    bsp_display_lock(-1);if(!atomic_load(&setup_active))screen_ui_update(&last,fetched,state,last_received,last_from_usb);bsp_display_unlock();
 }
 static void wifi_event(void *arg,esp_event_base_t base,int32_t id,void *data){
     (void)arg;(void)data;
@@ -235,7 +246,7 @@ static void read_quota(void){
         if(status==401||status==403){memset(&last,0,sizeof(last));fetched=false;state="PAIR AGAIN";}
         else if(status==200){
             while(size<16385){int n=esp_http_client_read(c,body+size,16385-size);if(n<0)break;if(!n){valid=esp_http_client_is_complete_data_received(c);break;}size+=n;}
-            quota_view next;if(valid&&quota_parse(body,size,time(NULL),&next)){last=next;fetched=true;last_received=time(NULL);ESP_LOGI("pixora","Authenticated device response accepted (%s)",next.stale?"stale":"fresh");state=!(next.primary.known||next.weekly.known)?"NO QUOTA DATA":next.stale?"STALE / CACHED":"CONNECTED";}
+            quota_view next;if(valid&&quota_parse(body,size,time(NULL),&next)){last=next;last_from_usb=false;fetched=true;last_received=time(NULL);ESP_LOGI("pixora","Authenticated device response accepted (%s)",next.stale?"stale":"fresh");state=!(next.primary.known||next.weekly.known)?"NO QUOTA DATA":next.stale?"STALE / CACHED":"CONNECTED";}
             else{last.stale=true;state="INVALID DATA / CACHED";}
         }else{last.stale=true;state="SERVER ERROR / CACHED";}
     }else{last.stale=true;state="NETWORK ERROR / CACHED";}
@@ -286,8 +297,49 @@ static void native_connect(wifi_ui_command *command){
     }
     memset(command,0,sizeof(*command));bsp_display_lock(-1);screen_ui_wifi_connect_result(ok,message);bsp_display_unlock();
 }
+static void usb_reader(void *arg){
+    (void)arg;char *line=malloc(USB_FRAME_MAX+1);if(!line){vTaskDelete(NULL);return;}
+    size_t used=0;bool overflow=false;unsigned char buffer[256];
+    while(true){
+        int count=usb_serial_jtag_read_bytes(buffer,sizeof(buffer),pdMS_TO_TICKS(100));
+        for(int i=0;i<count;i++){
+            unsigned char ch=buffer[i];
+            if(ch=='\n'){
+                if(!overflow&&used&&atomic_load(&usb_enabled)){
+                    if(line[used-1]=='\r'){used--;}
+                    usb_message message;
+                    if(usb_frame_parse(line,used,token,usb_nonce,&message))xQueueOverwrite(usb_messages,&message);
+                }
+                used=0;overflow=false;
+            }else if(!overflow){if(used<USB_FRAME_MAX)line[used++]=(char)ch;else overflow=true;}
+        }
+    }
+}
+static bool handle_usb(void){
+    static int64_t hello_at;usb_message message;
+    if(!atomic_load(&usb_enabled)){
+        if(usb_signal_at){memset(&last,0,sizeof(last));fetched=false;usb_signal_at=0;last_from_usb=false;}
+        while(xQueueReceive(usb_messages,&message,0)==pdTRUE){}return false;
+    }
+    int64_t now_us=esp_timer_get_time();
+    if(now_us-hello_at>=5000000||!hello_at){ESP_LOGI("pixora","PXUSB_HELLO %s %s",usb_nonce,usb_hello_proof);hello_at=now_us;}
+    if(xQueueReceive(usb_messages,&message,0)==pdTRUE&&message.sequence>usb_sequence){
+        usb_sequence=message.sequence;usb_signal_at=now_us;last_from_usb=true;
+        struct timeval clock={.tv_sec=message.epoch};settimeofday(&clock,NULL);
+        if(message.kind==1){last=message.quota;fetched=true;last_received=message.epoch;state=last.stale?"MAC USB / STALE":"MAC USB / CONNECTED";}
+        else if(message.kind==2){memset(&last,0,sizeof(last));fetched=false;state="MAC USB / PAIR AGAIN";}
+        else{last.stale=true;state="MAC USB / OFFLINE";}
+        ESP_LOGI("pixora","PXUSB_ACK %" PRIu32 " %s",message.sequence,message.kind==1?"data":message.kind==2?"revoked":"offline");
+    }
+    if(usb_signal_at&&now_us-usb_signal_at<65000000){
+        if(fetched&&quota_expired(&last,time(NULL))){state="MAC USB / STALE";}
+        draw();return true;
+    }
+    if(usb_signal_at){last.stale=true;state="MAC USB / STALE";}
+    return false;
+}
 static void collector(void *arg){
-    (void)arg;int failures=0,ticks=0;
+    (void)arg;int failures=0,ticks=0;int64_t next_wifi_attempt=0;
     while(true){
         if(atomic_exchange(&setup_requested,false))setup_start();
         if(atomic_load(&setup_active)){vTaskDelay(pdMS_TO_TICKS(1000));continue;}
@@ -297,14 +349,12 @@ static void collector(void *arg){
             else if(command.kind==WIFI_UI_CONNECT){native_connect(&command);ticks=0;}
             memset(&command,0,sizeof(command));
         }
+        if(handle_usb()){vTaskDelay(pdMS_TO_TICKS(1000));continue;}
         if(!(xEventGroupGetBits(network)&1)){
-            state="WI-FI OFFLINE / CACHED";last.stale=true;draw();esp_wifi_connect();
-            if(!(xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(12000))&1)){failures++;if(failures==2){
-                esp_err_t legacy=esp_wifi_set_protocol(WIFI_IF_STA,WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G);
-                esp_wifi_set_bandwidth(WIFI_IF_STA,WIFI_BW_HT20);esp_wifi_set_ps(WIFI_PS_NONE);
-                ESP_LOGW("pixora","Trying legacy 2.4GHz radio compatibility (result %d)",(int)legacy);
-            }if(failures>=3){state="CHECK WI-FI / SETUP";draw();}vTaskDelay(pdMS_TO_TICKS(3000));continue;}
-            failures=0;ticks=0;
+            state="WI-FI OFFLINE / CACHED";last.stale=true;draw();
+            if(esp_timer_get_time()>=next_wifi_attempt){esp_wifi_connect();next_wifi_attempt=esp_timer_get_time()+15000000;failures++;}
+            if(!(xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(1000))&1)){if(failures>=3){state="CHECK WI-FI / SETUP";draw();}continue;}
+            failures=0;ticks=0;next_wifi_attempt=0;
         }
         if(time(NULL)<1700000000){state="SYNCING TIME";draw();vTaskDelay(pdMS_TO_TICKS(1000));continue;}
         if(!ticks){read_quota();ticks=30;}
@@ -315,11 +365,14 @@ static void collector(void *arg){
 void app_main(void){
     setenv("TZ","UTC0",1);tzset();
     // Never erase user NVS automatically on an initialization error.
-    ESP_ERROR_CHECK(nvs_flash_init());load_config();wifi_commands=xQueueCreate(1,sizeof(wifi_ui_command));assert(wifi_commands);display_init();
+    ESP_ERROR_CHECK(nvs_flash_init());load_config();wifi_commands=xQueueCreate(1,sizeof(wifi_ui_command));usb_messages=xQueueCreate(1,sizeof(usb_message));assert(wifi_commands&&usb_messages);
+    for(int i=0;i<16;i++)snprintf(usb_nonce+i*2,3,"%02x",(unsigned)(esp_random()&255));
+    char hello[40];snprintf(hello,sizeof(hello),"hello %s",usb_nonce);assert(usb_digest(token,hello,strlen(hello),usb_hello_proof));
+    display_init();
     ESP_ERROR_CHECK(esp_netif_init());ESP_ERROR_CHECK(esp_event_loop_create_default());network=xEventGroupCreate();esp_netif_create_default_wifi_sta();esp_netif_create_default_wifi_ap();
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();ESP_ERROR_CHECK(esp_wifi_init(&init));ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,wifi_event,NULL));ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,IP_EVENT_STA_GOT_IP,wifi_event,NULL));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));wifi_config_t sta={0};memcpy(sta.sta.ssid,ssid,strlen(ssid));memcpy(sta.sta.password,password,strlen(password));sta.sta.threshold.authmode=password[0]?WIFI_AUTH_WPA_PSK:WIFI_AUTH_OPEN;sta.sta.sae_pwe_h2e=WPA3_SAE_PWE_BOTH;sta.sta.pmf_cfg.capable=true;ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta));ESP_ERROR_CHECK(esp_wifi_start());ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));wifi_config_t sta={0};memcpy(sta.sta.ssid,ssid,strlen(ssid));memcpy(sta.sta.password,password,strlen(password));sta.sta.threshold.authmode=password[0]?WIFI_AUTH_WPA_PSK:WIFI_AUTH_OPEN;sta.sta.sae_pwe_h2e=WPA3_SAE_PWE_BOTH;sta.sta.pmf_cfg.capable=true;ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta));ESP_ERROR_CHECK(esp_wifi_start());
     if(ssid[0]){
         wifi_scan_config_t scan={0};scan.ssid=(uint8_t*)ssid;scan.show_hidden=true;
         if(esp_wifi_scan_start(&scan,true)==ESP_OK){
@@ -334,5 +387,8 @@ void app_main(void){
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);esp_sntp_setservername(0,"pool.ntp.org");esp_sntp_init();
     if(!config_valid())setup_start();
     else if(!ssid[0]){bsp_display_lock(-1);screen_ui_open_wifi();bsp_display_unlock();}
+    usb_serial_jtag_driver_config_t usb_config={.tx_buffer_size=256,.rx_buffer_size=4096};
+    if(!usb_serial_jtag_is_driver_installed())ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_config));
+    xTaskCreate(usb_reader,"pixora-usb",8192,NULL,5,NULL);
     xTaskCreate(collector,"pixora-poll",12288,NULL,3,NULL);
 }
