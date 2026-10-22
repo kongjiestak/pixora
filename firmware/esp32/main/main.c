@@ -299,7 +299,11 @@ static void collector(void *arg){
         }
         if(!(xEventGroupGetBits(network)&1)){
             state="WI-FI OFFLINE / CACHED";last.stale=true;draw();esp_wifi_connect();
-            if(!(xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(12000))&1)){failures++;if(failures>=3){state="CHECK WI-FI / SETUP";draw();}vTaskDelay(pdMS_TO_TICKS(3000));continue;}
+            if(!(xEventGroupWaitBits(network,1,pdFALSE,pdFALSE,pdMS_TO_TICKS(12000))&1)){failures++;if(failures==2){
+                esp_err_t legacy=esp_wifi_set_protocol(WIFI_IF_STA,WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G);
+                esp_wifi_set_bandwidth(WIFI_IF_STA,WIFI_BW_HT20);esp_wifi_set_ps(WIFI_PS_NONE);
+                ESP_LOGW("pixora","Trying legacy 2.4GHz radio compatibility (result %d)",(int)legacy);
+            }if(failures>=3){state="CHECK WI-FI / SETUP";draw();}vTaskDelay(pdMS_TO_TICKS(3000));continue;}
             failures=0;ticks=0;
         }
         if(time(NULL)<1700000000){state="SYNCING TIME";draw();vTaskDelay(pdMS_TO_TICKS(1000));continue;}
@@ -315,7 +319,7 @@ void app_main(void){
     ESP_ERROR_CHECK(esp_netif_init());ESP_ERROR_CHECK(esp_event_loop_create_default());network=xEventGroupCreate();esp_netif_create_default_wifi_sta();esp_netif_create_default_wifi_ap();
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();ESP_ERROR_CHECK(esp_wifi_init(&init));ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,wifi_event,NULL));ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,IP_EVENT_STA_GOT_IP,wifi_event,NULL));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));wifi_config_t sta={0};memcpy(sta.sta.ssid,ssid,strlen(ssid));memcpy(sta.sta.password,password,strlen(password));sta.sta.threshold.authmode=password[0]?WIFI_AUTH_WPA_PSK:WIFI_AUTH_OPEN;sta.sta.sae_pwe_h2e=WPA3_SAE_PWE_BOTH;sta.sta.pmf_cfg.capable=true;ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta));ESP_ERROR_CHECK(esp_wifi_start());
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));wifi_config_t sta={0};memcpy(sta.sta.ssid,ssid,strlen(ssid));memcpy(sta.sta.password,password,strlen(password));sta.sta.threshold.authmode=password[0]?WIFI_AUTH_WPA_PSK:WIFI_AUTH_OPEN;sta.sta.sae_pwe_h2e=WPA3_SAE_PWE_BOTH;sta.sta.pmf_cfg.capable=true;ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta));ESP_ERROR_CHECK(esp_wifi_start());ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     if(ssid[0]){
         wifi_scan_config_t scan={0};scan.ssid=(uint8_t*)ssid;scan.show_hidden=true;
         if(esp_wifi_scan_start(&scan,true)==ESP_OK){
