@@ -17,6 +17,7 @@
 #include "esp_random.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_lcd_panel_io.h"
 #include "esp_http_server.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
@@ -92,14 +93,22 @@ static void request_setup(void){atomic_store(&setup_requested,true);}
 static esp_err_t checked_touch_read(esp_lcd_touch_handle_t touch,
         esp_lcd_touch_point_data_t *points,uint8_t *count,uint8_t capacity,void *context){
     (void)context;
-    static unsigned reads,errors,presses,releases;static bool pressed;
+    static unsigned reads,errors,ack_errors,presses,releases;static bool pressed;
     *count=0;
     esp_err_t result=esp_lcd_touch_read_data(touch);
+    /* Re-arm the CST92xx report after every successful bus transaction,
+     * including an empty/invalid-marker report (SensorLib protocol). The
+     * managed driver decodes the report but omits this write. */
+    if(result==ESP_OK||result==ESP_ERR_INVALID_RESPONSE){
+        const uint8_t acknowledge[]={0x00,0xab};
+        esp_err_t ack=esp_lcd_panel_io_tx_param(touch->io,0xd0,acknowledge,sizeof(acknowledge));
+        if(ack!=ESP_OK){ack_errors++;result=ack;}
+    }
     if(result==ESP_OK)result=esp_lcd_touch_get_data(touch,points,count,capacity);
     if(result!=ESP_OK){*count=0;errors++;}
     bool next=*count>0;
     if(next!=pressed){if(next)presses++;else releases++;pressed=next;}
-    if(++reads%300==0)ESP_LOGI("pixora_touch","touch reads=%u errors=%u presses=%u releases=%u held=%u",reads,errors,presses,releases,pressed);
+    if(++reads%300==0)ESP_LOGI("pixora_touch","touch reads=%u errors=%u ack_errors=%u presses=%u releases=%u held=%u",reads,errors,ack_errors,presses,releases,pressed);
     return result;
 }
 static void touch_poll_fallback(lv_timer_t *timer){

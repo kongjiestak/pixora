@@ -97,6 +97,9 @@ def run(config, once=False):
                     navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+ face=\d+ build_ms=\d+)', line)
                     if navigation:
                         print('Display navigation: ' + navigation[1].decode(), flush=True)
+                    touch = re.search(rb'pixora_touch: touch (reads=\d+ errors=\d+ ack_errors=\d+ presses=\d+ releases=\d+ held=[01])', line)
+                    if touch:
+                        print('Display touch: ' + touch[1].decode(), flush=True)
                     candidate = hello_nonce(line, config['token'])
                     if candidate and candidate != nonce:
                         nonce = candidate; sequence = int(time.time()); due = 0
