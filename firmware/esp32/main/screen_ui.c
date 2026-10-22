@@ -128,21 +128,35 @@ static void update_digits(const struct tm *tm,bool valid){
  lv_opa_t opacity=valid&&motion&&(tm->tm_sec%2)?LV_OPA_30:LV_OPA_COVER;if(lv_obj_get_style_text_opa(digits[2],LV_PART_MAIN)!=opacity)lv_obj_set_style_text_opa(digits[2],opacity,0);
 }
 static int64_t navigation_paint_at;
+static bool transition_requested,transition_active,transition_wait_paint;
+static int transition_level;
+static void deferred_render(void *unused);
+static void transition_brightness(void *unused,int32_t value){
+ (void)unused;if(bsp_display_brightness_set(value)==ESP_OK)last_brightness=value;
+}
+static void transition_finished(lv_anim_t *anim){(void)anim;transition_active=false;}
+static void transition_dark(lv_anim_t *anim){(void)anim;transition_wait_paint=true;deferred_render(NULL);}
+static void transition_animate(int from,int to,unsigned duration,lv_anim_completed_cb_t done){
+ lv_anim_t anim;lv_anim_init(&anim);lv_anim_set_var(&anim,&transition_level);lv_anim_set_values(&anim,from,to);lv_anim_set_duration(&anim,duration);lv_anim_set_path_cb(&anim,lv_anim_path_ease_in_out);lv_anim_set_exec_cb(&anim,transition_brightness);lv_anim_set_completed_cb(&anim,done);lv_anim_start(&anim);
+}
 static void deferred_render(void *unused){
- int64_t started=esp_timer_get_time();(void)unused;lv_indev_t *input=pixora_display_get_input_dev();
+ (void)unused;
+ if(transition_requested){transition_requested=false;transition_active=true;transition_level=last_brightness>=0?last_brightness:(int)brightness;transition_animate(transition_level,0,90,transition_dark);return;}
+ int64_t started=esp_timer_get_time();lv_indev_t *input=pixora_display_get_input_dev();
  if(input){lv_indev_reset(input,NULL);lv_indev_wait_release(input);}
  navigation_paint_at=started;render_pending=false;render_now();
  if(page==0&&!warm_done){unsigned saved=face;for(unsigned i=0;i<3;i++)if(i!=saved){face=i;clock_mode=face==1;render_now();}face=saved;clock_mode=face==1;render_now();warm_done=true;}
  ESP_LOGI("pixora_ui","navigation ready page=%u face=%u build_ms=%lld",page,face,(long long)((esp_timer_get_time()-started)/1000));
 }
 static void render(void){if(render_pending)return;render_pending=true;if(lv_async_call(deferred_render,NULL)!=LV_RESULT_OK)render_pending=false;}
-static void home_menu(lv_event_t *event){(void)event;if(page)return;if(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN))return;page=1;render();}
+static void home_menu(lv_event_t *event){(void)event;if(render_pending||transition_active||page)return;if(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN))return;page=1;render();}
 static void gesture(lv_event_t *event){
- (void)event;if(page||(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN)))return;lv_indev_t *input=lv_indev_active();if(!input)return;
- lv_dir_t direction=lv_indev_get_gesture_dir(input);if(direction==LV_DIR_LEFT||direction==LV_DIR_RIGHT){face=(face+(direction==LV_DIR_LEFT?1:2))%3;clock_mode=face==1;face_save_pending=true;face_save_at=lv_tick_get();render();}
+ (void)event;if(render_pending||transition_active||page||(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN)))return;lv_indev_t *input=lv_indev_active();if(!input)return;
+ lv_dir_t direction=lv_indev_get_gesture_dir(input);if(direction==LV_DIR_LEFT||direction==LV_DIR_RIGHT){face=(face+(direction==LV_DIR_LEFT?1:2))%3;clock_mode=face==1;face_save_pending=true;face_save_at=lv_tick_get();transition_requested=motion&&warm_done;render();}
 }
 static void wake(lv_event_t *event){(void)event;lv_display_trigger_activity(NULL);if(home_controls)lv_obj_remove_flag(home_controls,LV_OBJ_FLAG_HIDDEN);if(wake_layer)lv_obj_add_flag(wake_layer,LV_OBJ_FLAG_HIDDEN);}
 static void action(lv_event_t *event){
+ if(transition_active)return;
  unsigned id=(unsigned)(uintptr_t)lv_event_get_user_data(event);
  ESP_LOGI("pixora_ui","navigation action=%u page=%u",id,page);
  if(id==44){ble_on=!ble_on;persist();if(ble_callback)ble_callback(ble_on);}
@@ -230,7 +244,7 @@ static void update_clock(void){
 
 }
 static void tick(lv_timer_t *t){
- (void)t;if(face_save_pending&&lv_tick_get()-face_save_at>=1000)persist();if(paused||render_pending)return;
+ (void)t;if(transition_active)return;if(face_save_pending&&lv_tick_get()-face_save_at>=1000)persist();if(paused||render_pending)return;
  time_t local=time(NULL)+timezone_quarters*900;struct tm tm;gmtime_r(&local,&tm);
  bool idle=lv_display_get_inactive_time(NULL)>15000;
  int target=(night&&time(NULL)>1700000000&&(tm.tm_hour>=22||tm.tm_hour<7)&&idle)?8:(int)brightness;
@@ -319,6 +333,7 @@ static void refresh_measure(lv_event_t *event){
  if(lv_event_get_code(event)!=LV_EVENT_REFR_READY||!started||!rendered)return;
  if(navigation_paint_at){
   ESP_LOGI("pixora_ui","navigation paint page=%u face=%u paint_ms=%lld",page,face,(long long)((esp_timer_get_time()-navigation_paint_at)/1000));navigation_paint_at=0;
+  if(transition_wait_paint){transition_wait_paint=false;transition_animate(0,transition_level,170,transition_finished);}
  }
  int64_t elapsed=esp_timer_get_time()-started;started=0;total+=elapsed;if(elapsed>maximum)maximum=elapsed;
  if(++samples==10){ESP_LOGI("pixora_ui","refresh samples=10 mean_ms=%lld max_ms=%lld",(long long)(total/10000),(long long)(maximum/1000));samples=0;total=maximum=0;}
@@ -337,7 +352,7 @@ void screen_ui_update(const quota_view *view,bool fetched,const char *state,int6
  usb_source=from_usb;
  if(latest!=received){received=latest;}snapshot=*view;has_data=fetched;snprintf(connection,sizeof(connection),"%s",state);update_home();if(!page&&!paused&&!render_pending){update_clock();}
 }
-void screen_ui_pause(void){paused=true;lv_anim_delete_all();}
+void screen_ui_pause(void){paused=true;lv_anim_delete_all();if(transition_active)transition_brightness(NULL,transition_level);transition_active=transition_requested=transition_wait_paint=false;}
 
 static void begin_scan(void){
  if(wifi_busy){render();return;}
