@@ -25,4 +25,4 @@ jobs:
           esp_idf_version: v5.5.5
           target: esp32s3
           path: firmware/esp32
-          command: idf.py build && CC=gcc ./host-tests/run.sh
+          command: idf.py build && CC=gcc ./host-tests/run.sh && cmake -S host-tests/ui -B build-ui-host -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ && cmake --build build-ui-host -j 4 && ./build-ui-host/ui-smoke

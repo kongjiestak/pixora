@@ -15,3 +15,5 @@ Primary sources:
 https://github.com/espressif/esp-idf/tree/v5.5.5
 https://github.com/waveshareteam/Waveshare-ESP32-components
 https://github.com/lvgl/lvgl/tree/v9.3.0
+
+- Pixora UI CJK bitmap subset: Noto Sans CJK SC Regular Sans2.004, original copyright © 2014–2021 Adobe, SIL OFL 1.1. See `fonts/README.md` and `fonts/OFL.txt`; the font is not MIT.

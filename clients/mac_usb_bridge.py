@@ -94,6 +94,9 @@ def run(config, once=False):
                     metric = re.search(rb'pixora_ui: refresh samples=(\d+) mean_ms=(\d+) max_ms=(\d+)', line)
                     if metric:
                         print('Display refresh: samples=%s mean_ms=%s max_ms=%s' % tuple(x.decode() for x in metric.groups()), flush=True)
+                    navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+)', line)
+                    if navigation:
+                        print('Display navigation: ' + navigation[1].decode(), flush=True)
                     candidate = hello_nonce(line, config['token'])
                     if candidate and candidate != nonce:
                         nonce = candidate; sequence = int(time.time()); due = 0
