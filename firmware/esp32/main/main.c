@@ -22,6 +22,7 @@
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
 #include "quota.h"
+#include "setup_address.h"
 
 // Private configuration is provisioned in NVS, never built into the firmware.
 static char ssid[33],password[65],server[257],token[129];
@@ -107,8 +108,17 @@ static const char form[]=
 "<label>显示令牌 / Display token<input name=token type=password maxlength=128 autocomplete=off></label></details>"
 "<button>保存并连接 / Save and connect</button></form><p>2.4 GHz Wi-Fi only. If connection fails, tap Wi-Fi / Setup on the screen, then scan its new code.</p></html>";
 static bool ap_request(httpd_req_t *r){
-    struct sockaddr_in local={0};socklen_t length=sizeof(local);
-    return atomic_load(&setup_active)&&getsockname(httpd_req_to_sockfd(r),(struct sockaddr*)&local,&length)==0&&local.sin_family==AF_INET&&local.sin_addr.s_addr==inet_addr("192.168.4.1");
+    struct sockaddr_storage local={0};socklen_t length=sizeof(local);
+    if(!atomic_load(&setup_active)||getsockname(httpd_req_to_sockfd(r),(struct sockaddr*)&local,&length)!=0)return false;
+    if(local.ss_family==AF_INET&&length>=sizeof(struct sockaddr_in)){
+        const struct sockaddr_in *v4=(const struct sockaddr_in*)&local;
+        return setup_address_allowed((const unsigned char*)&v4->sin_addr,4);
+    }
+    if(local.ss_family==AF_INET6&&length>=sizeof(struct sockaddr_in6)){
+        const struct sockaddr_in6 *v6=(const struct sockaddr_in6*)&local;
+        return setup_address_allowed((const unsigned char*)&v6->sin6_addr,16);
+    }
+    return false;
 }
 static esp_err_t form_get(httpd_req_t *r){
     if(!ap_request(r))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Join device setup Wi-Fi first");
