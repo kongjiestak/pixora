@@ -21,6 +21,7 @@ static lv_timer_t *timer;
 static quota_view snapshot;
 static bool usb_source,usb_on;
 static void (*usb_callback)(bool);
+static bool home_dirty=true;
 static bool has_data,paused,motion=true,settings_saved=true;
 static unsigned theme,accent,focus,page;
 static int64_t received;
@@ -87,6 +88,10 @@ static void button(const char *value,int x,int y,int width,unsigned id){
 static void update_home(void){
  if(paused||page||clock_mode)return;
  time_t now=time(NULL);bool stale=!has_data||quota_expired(&snapshot,now);const screen_palette *p=palette();
+ static quota_view shown;static char shown_connection[64];static int64_t shown_minute=-1;static bool shown_stale;
+ if(!home_dirty&&shown_minute==now/60&&shown_stale==stale&&!memcmp(&shown,&snapshot,sizeof(snapshot))&&!strcmp(shown_connection,connection))return;
+ home_dirty=false;shown=snapshot;shown_minute=now/60;shown_stale=stale;snprintf(shown_connection,sizeof(shown_connection),"%s",connection);
+
  label_value(status,connection);lv_obj_set_style_text_color(status,lv_color_hex(stale?p->warning:p->muted),0);
  const quota_window *slots[2]={&snapshot.primary,&snapshot.weekly};
  for(int i=0;i<2;i++){
@@ -126,7 +131,7 @@ static void tick(lv_timer_t *t){
  if(lv_tick_get()-last_clock_tick>=1000){last_clock_tick=lv_tick_get();update_clock();update_home();}
 }
 static void render(void){
- const screen_palette *p=palette();clock_label=NULL;wifi_input=NULL;wifi_note=NULL;lv_obj_clean(root);lv_obj_set_style_bg_color(root,lv_color_hex(p->ground),0);lv_obj_remove_flag(root,LV_OBJ_FLAG_SCROLLABLE);
+ home_dirty=true;const screen_palette *p=palette();clock_label=NULL;wifi_input=NULL;wifi_note=NULL;lv_obj_clean(root);lv_obj_set_style_bg_color(root,lv_color_hex(p->ground),0);lv_obj_remove_flag(root,LV_OBJ_FLAG_SCROLLABLE);
  lv_obj_set_style_bg_grad_color(root,lv_color_hex(p->raised),0);lv_obj_set_style_bg_grad_dir(root,theme==3?LV_GRAD_DIR_VER:LV_GRAD_DIR_NONE,0);
  if(page>=6&&page<=9){wifi_page();return;}
  if(page){
@@ -146,9 +151,10 @@ static void render(void){
  }
  wake_layer=NULL;home_controls=NULL;page_control=NULL;
  clock_label=text("--:--",clock_mode?&lv_font_montserrat_48:&lv_font_montserrat_24,clock_mode?0:-105,clock_mode?166:38,p->ink);
- date_label=text("Waiting for time",&lv_font_montserrat_18,clock_mode?0:100,clock_mode?239:43,p->muted);
- weather_label=text("Weather --",&lv_font_montserrat_18,clock_mode?0:-92,clock_mode?289:385,p->ink);
- city_label=text("",&wifi_font,clock_mode?0:-92,clock_mode?322:412,p->muted);lv_obj_set_width(city_label,clock_mode?290:210);lv_label_set_long_mode(city_label,LV_LABEL_LONG_DOT);lv_obj_set_style_text_align(city_label,LV_TEXT_ALIGN_CENTER,0);
+ if(clock_mode){lv_obj_set_style_transform_pivot_x(clock_label,lv_pct(50),0);lv_obj_set_style_transform_pivot_y(clock_label,lv_pct(50),0);lv_obj_set_style_transform_scale_x(clock_label,512,0);lv_obj_set_style_transform_scale_y(clock_label,512,0);}
+ date_label=text("Waiting for time",&lv_font_montserrat_18,clock_mode?0:100,clock_mode?267:43,p->muted);
+ weather_label=text("Weather --",&lv_font_montserrat_18,clock_mode?0:-92,clock_mode?310:385,p->ink);
+ city_label=text("",&wifi_font,clock_mode?0:-92,clock_mode?339:412,p->muted);lv_obj_set_width(city_label,clock_mode?290:210);lv_label_set_long_mode(city_label,LV_LABEL_LONG_DOT);lv_obj_set_style_text_align(city_label,LV_TEXT_ALIGN_CENTER,0);
  if(!clock_mode){
  for(int i=0;i<2;i++){
   rings[i]=lv_arc_create(root);int size=286-i*40;lv_obj_set_size(rings[i],size,size);lv_obj_align(rings[i],LV_ALIGN_TOP_MID,0,91+i*20);lv_arc_set_range(rings[i],0,100);lv_arc_set_rotation(rings[i],270);lv_arc_set_bg_angles(rings[i],0,360);lv_arc_set_value(rings[i],0);lv_obj_remove_style(rings[i],NULL,LV_PART_KNOB);lv_obj_remove_flag(rings[i],LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_arc_width(rings[i],8,LV_PART_MAIN);lv_obj_set_style_arc_width(rings[i],8,LV_PART_INDICATOR);lv_obj_set_style_arc_color(rings[i],lv_color_hex(p->track),LV_PART_MAIN);
