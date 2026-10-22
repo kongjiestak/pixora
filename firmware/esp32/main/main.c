@@ -21,8 +21,10 @@
 #include "nvs.h"
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
+#include "cJSON.h"
 #include "quota.h"
 #include "setup_address.h"
+#include "setup_request.h"
 
 // Private configuration is provisioned in NVS, never built into the firmware.
 static char ssid[33],password[65],server[257],token[129];
@@ -32,7 +34,7 @@ static lv_obj_t *status_label,*age_label,*percent[2],*arcs[2],*reset[2],*screen;
 static quota_view last;
 static bool fetched;
 static const char *state="CONNECTING";
-static char ap_name[32],ap_pass[17];
+static char ap_name[32],ap_pass[17],setup_nonce[33];
 static int64_t last_received;
 static void setup_start(void);
 static bool config_valid(void){
@@ -100,13 +102,13 @@ static void wifi_event(void *arg,esp_event_base_t base,int32_t id,void *data){
 }
 static const char form[]=
 "<!doctype html><html lang=en><meta name=viewport content='width=device-width,initial-scale=1'><meta name=referrer content=no-referrer><title>Pixora Setup</title>"
-"<style>body{font:17px system-ui;max-width:480px;margin:30px auto;padding:20px;background:#f3f0e8;color:#132c28}input,button{box-sizing:border-box;width:100%;font:inherit;padding:14px;margin:10px 0 22px}small{display:block}summary{padding:16px 0}</style>"
-"<h1>Pixora</h1><p>连接你的 Wi-Fi / Connect Wi-Fi</p><form method=post action=/save><label>Wi-Fi 名称 / SSID<input name=ssid maxlength=32 required></label>"
+"<style>body{font:17px system-ui;max-width:480px;margin:30px auto;padding:20px;background:#f3f0e8;color:#132c28}input,button,select{box-sizing:border-box;width:100%;font:inherit;padding:14px;margin:10px 0 22px}small{display:block}summary{padding:16px 0}</style>"
+"<h1>Pixora</h1><p>连接你的 Wi-Fi / Connect Wi-Fi</p><label>附近的 2.4GHz 网络 / Nearby networks<select id=networks><option value=>扫描中 / Scanning…</option></select></label><button id=scan type=button>重新扫描 / Scan again</button><small id=scan-status role=status></small><form method=post action=/save><input type=hidden name=csrf value=\"%s\"><label>Wi-Fi 名称（可手动填写隐藏网络）/ SSID<input id=ssid name=ssid maxlength=32 required autocomplete=off></label>"
 "<label>Wi-Fi 密码 / Password<input name=password type=password maxlength=64 autocomplete=off></label>"
 "<details><summary>高级连接设置 / Advanced</summary><small>已配对设备可留空。New devices require a scoped display token, never an admin or collector key.</small>"
 "<label>服务地址 / HTTPS server<input name=server type=url maxlength=240 placeholder='https://your-pixora.example'></label>"
 "<label>显示令牌 / Display token<input name=token type=password maxlength=128 autocomplete=off></label></details>"
-"<button>保存并连接 / Save and connect</button></form><p>2.4 GHz Wi-Fi only. If connection fails, tap Wi-Fi / Setup on the screen, then scan its new code.</p></html>";
+"<button>保存并连接 / Save and connect</button></form><p><script src=/setup.js defer></script>2.4 GHz Wi-Fi only. If connection fails, tap Wi-Fi / Setup on the screen, then scan its new code.</p></html>";
 static bool ap_request(httpd_req_t *r){
     struct sockaddr_storage local={0};socklen_t length=sizeof(local);
     if(!atomic_load(&setup_active)||getsockname(httpd_req_to_sockfd(r),(struct sockaddr*)&local,&length)!=0)return false;
@@ -123,8 +125,44 @@ static bool ap_request(httpd_req_t *r){
 static esp_err_t form_get(httpd_req_t *r){
     if(!ap_request(r))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Join device setup Wi-Fi first");
     httpd_resp_set_type(r,"text/html; charset=utf-8");httpd_resp_set_hdr(r,"Cache-Control","no-store");
-    httpd_resp_set_hdr(r,"Content-Security-Policy","default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'");
-    return httpd_resp_send(r,form,HTTPD_RESP_USE_STRLEN);
+    httpd_resp_set_hdr(r,"Content-Security-Policy","default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+    const char *marker=strstr(form,"%s");
+    if(!marker)return ESP_FAIL;
+    if(httpd_resp_send_chunk(r,form,marker-form)!=ESP_OK)return ESP_FAIL;
+    if(httpd_resp_send_chunk(r,setup_nonce,strlen(setup_nonce))!=ESP_OK)return ESP_FAIL;
+    if(httpd_resp_send_chunk(r,marker+2,strlen(marker+2))!=ESP_OK)return ESP_FAIL;
+    return httpd_resp_send_chunk(r,NULL,0);
+}
+static const char setup_js[]=
+"const list=document.querySelector('#networks'),ssid=document.querySelector('#ssid'),button=document.querySelector('#scan'),status=document.querySelector('#scan-status');"
+"list.addEventListener('change',()=>{if(list.value)ssid.value=list.value;});"
+"async function scan(){button.disabled=true;status.textContent='正在扫描 / Scanning…';try{const r=await fetch('/networks',{cache:'no-store'});if(!r.ok)throw Error();const rows=await r.json();list.replaceChildren(new Option('选择网络或手动填写 / Select or enter manually',''));for(const n of rows){list.add(new Option(n.ssid+' · '+n.rssi+' dBm · '+(n.secure?'加密 / Secured':'开放 / Open'),n.ssid));}status.textContent=rows.length?'仅列出 2.4GHz 网络 / 2.4GHz networks only':'未发现网络，可重新扫描或手动填写 / No networks found';}catch(e){status.textContent='扫描失败，请重试或手动填写 / Scan failed; retry or enter manually';}finally{button.disabled=false;}}button.addEventListener('click',scan);scan();";
+static esp_err_t script_get(httpd_req_t *r){
+    if(!ap_request(r))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Join device setup Wi-Fi first");
+    httpd_resp_set_type(r,"application/javascript; charset=utf-8");httpd_resp_set_hdr(r,"Cache-Control","no-store");
+    return httpd_resp_send(r,setup_js,HTTPD_RESP_USE_STRLEN);
+}
+static esp_err_t networks_get(httpd_req_t *r){
+    if(!ap_request(r))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Join device setup Wi-Fi first");
+    wifi_scan_config_t config={0};config.scan_type=WIFI_SCAN_TYPE_ACTIVE;
+    config.scan_time.active.min=40;config.scan_time.active.max=100;
+    if(esp_wifi_scan_start(&config,true)!=ESP_OK)return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"Scan failed; retry");
+    uint16_t count=24;wifi_ap_record_t *rows=calloc(count,sizeof(*rows));
+    if(!rows){esp_wifi_clear_ap_list();return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"Not enough memory");}
+    if(esp_wifi_scan_get_ap_records(&count,rows)!=ESP_OK){free(rows);esp_wifi_clear_ap_list();return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"Scan unavailable");}
+    cJSON *result=cJSON_CreateArray();
+    for(int i=0;result&&i<count;i++){
+        rows[i].ssid[32]=0;if(!rows[i].ssid[0]||!strcmp((char*)rows[i].ssid,ap_name))continue;
+        bool duplicate=false;for(int j=0;j<i;j++)if(!strcmp((char*)rows[j].ssid,(char*)rows[i].ssid))duplicate=true;
+        if(duplicate)continue;
+        cJSON *item=cJSON_CreateObject();if(!item)continue;
+        cJSON_AddStringToObject(item,"ssid",(char*)rows[i].ssid);cJSON_AddNumberToObject(item,"rssi",rows[i].rssi);
+        cJSON_AddBoolToObject(item,"secure",rows[i].authmode!=WIFI_AUTH_OPEN);cJSON_AddItemToArray(result,item);
+    }
+    free(rows);char *json=result?cJSON_PrintUnformatted(result):NULL;cJSON_Delete(result);
+    if(!json)return httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"Scan unavailable");
+    httpd_resp_set_type(r,"application/json; charset=utf-8");httpd_resp_set_hdr(r,"Cache-Control","no-store");
+    esp_err_t err=httpd_resp_sendstr(r,json);free(json);return err;
 }
 static bool decode(char *s){
     char *w=s;
@@ -139,11 +177,15 @@ static bool decode(char *s){
 static void restart_task(void *arg){(void)arg;vTaskDelay(pdMS_TO_TICKS(1500));esp_restart();}
 static esp_err_t form_save(httpd_req_t *r){
     if(!ap_request(r))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Join device setup Wi-Fi first");
-    char origin[80];if(httpd_req_get_hdr_value_str(r,"Origin",origin,sizeof(origin))!=ESP_OK||strcmp(origin,"http://192.168.4.1"))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Open setup page from device Wi-Fi");
+    // A no-referrer form can submit Origin: null in mobile browsers.
+    // A per-boot form nonce is mandatory even when Origin is absent/null.
+    char origin[80]={0};size_t origin_length=httpd_req_get_hdr_value_len(r,"Origin");
+    if(origin_length&&(httpd_req_get_hdr_value_str(r,"Origin",origin,sizeof(origin))!=ESP_OK||
+       !setup_origin_allowed(origin)))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Reopen setup page on device Wi-Fi");
     if(r->content_len<=0||r->content_len>2048)return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Form too large");
     char body[2049];int offset=0;
     while(offset<r->content_len){int n=httpd_req_recv(r,body+offset,r->content_len-offset);if(n<=0)return ESP_FAIL;offset+=n;}body[offset]=0;
-    char next_ssid[33]={0},next_pass[65]={0},next_server[257]={0},next_token[129]={0};int mask=0;char *save=NULL;
+    char next_ssid[33]={0},next_pass[65]={0},next_server[257]={0},next_token[129]={0},csrf[33]={0};int mask=0;char *save=NULL;
     for(char *p=strtok_r(body,"&",&save);p;p=strtok_r(NULL,"&",&save)){
         char *value=strchr(p,'=');if(!value)return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid form");*value++=0;
         if(!decode(value))return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid encoding");
@@ -152,9 +194,11 @@ static esp_err_t form_save(httpd_req_t *r){
         else if(!strcmp(p,"password")){bit=2;dest=next_pass;size=sizeof(next_pass);}
         else if(!strcmp(p,"server")){bit=4;dest=next_server;size=sizeof(next_server);}
         else if(!strcmp(p,"token")){bit=8;dest=next_token;size=sizeof(next_token);}
+        else if(!strcmp(p,"csrf")){bit=16;dest=csrf;size=sizeof(csrf);}
         if(!bit||(mask&bit)||strlen(value)>=size)return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Invalid field");
         strcpy(dest,value);mask|=bit;
     }
+    if(!(mask&16)||!setup_nonce_valid(csrf,setup_nonce))return httpd_resp_send_err(r,HTTPD_403_FORBIDDEN,"Setup page expired; reload and try again");
     if(!next_ssid[0])return httpd_resp_send_err(r,HTTPD_400_BAD_REQUEST,"Wi-Fi name required");
     // Keep secrets out of HTML and logs; empty advanced fields preserve provisioning.
     char old_server[257],old_token[129];strcpy(old_server,server);strcpy(old_token,token);
@@ -174,6 +218,7 @@ static esp_err_t form_save(httpd_req_t *r){
 }
 static void setup_start(void){
     if(atomic_exchange(&setup_active,true))return;
+    for(int i=0;i<16;i++)snprintf(setup_nonce+i*2,3,"%02x",(unsigned)(esp_random()&255));
     unsigned id=(unsigned)(esp_random()&0xffff);snprintf(ap_name,sizeof(ap_name),"Pixora-%04X",id);
     const char chars[]="abcdefghjkmnpqrstuvwxyz23456789";for(int i=0;i<16;i++)ap_pass[i]=chars[esp_random()%(sizeof(chars)-1)];ap_pass[16]=0;
     wifi_config_t ap={0};strcpy((char*)ap.ap.ssid,ap_name);strcpy((char*)ap.ap.password,ap_pass);ap.ap.ssid_len=strlen(ap_name);ap.ap.max_connection=1;ap.ap.authmode=WIFI_AUTH_WPA2_PSK;
@@ -181,6 +226,8 @@ static void setup_start(void){
     httpd_config_t cfg=HTTPD_DEFAULT_CONFIG();cfg.stack_size=8192;cfg.max_open_sockets=3;cfg.lru_purge_enable=true;
     httpd_handle_t http=NULL;ESP_ERROR_CHECK(httpd_start(&http,&cfg));
     httpd_uri_t get={.uri="/",.method=HTTP_GET,.handler=form_get},post={.uri="/save",.method=HTTP_POST,.handler=form_save};httpd_register_uri_handler(http,&get);httpd_register_uri_handler(http,&post);
+    httpd_uri_t js={.uri="/setup.js",.method=HTTP_GET,.handler=script_get},scan={.uri="/networks",.method=HTTP_GET,.handler=networks_get};
+    httpd_register_uri_handler(http,&js);httpd_register_uri_handler(http,&scan);
     bsp_display_lock(-1);lv_obj_clean(screen);
     label(screen,"Pixora Setup",&lv_font_montserrat_24,0,15);
     label(screen,"1. Scan to join device Wi-Fi",&lv_font_montserrat_18,0,57);

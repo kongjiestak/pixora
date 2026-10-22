@@ -12,3 +12,7 @@ ${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -fsanitize=ad
 ${CC:-cc} -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
   -I"$root/main" "$root/host-tests/test_setup_address.c" -o "$tmp/setup-address-test"
 "$tmp/setup-address-test"
+
+${CC:-cc} -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -O1 \
+  -I"$root/main" "$root/host-tests/test_setup_request.c" -o "$tmp/setup-request-test"
+"$tmp/setup-request-test"
