@@ -14,6 +14,7 @@
 #include "esp_netif.h"
 #include "esp_random.h"
 #include "esp_system.h"
+#include "esp_log.h"
 #include "esp_http_server.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
@@ -83,8 +84,8 @@ static void draw(void){
 }
 static void wifi_event(void *arg,esp_event_base_t base,int32_t id,void *data){
     (void)arg;(void)data;
-    if(base==IP_EVENT&&id==IP_EVENT_STA_GOT_IP)xEventGroupSetBits(network,1);
-    if(base==WIFI_EVENT&&id==WIFI_EVENT_STA_DISCONNECTED)xEventGroupClearBits(network,1);
+    if(base==IP_EVENT&&id==IP_EVENT_STA_GOT_IP){xEventGroupSetBits(network,1);ESP_LOGI("pixora","Wi-Fi station acquired IP");}
+    if(base==WIFI_EVENT&&id==WIFI_EVENT_STA_DISCONNECTED){xEventGroupClearBits(network,1);const wifi_event_sta_disconnected_t *event=data;ESP_LOGW("pixora","Wi-Fi disconnected (reason %u)",event?(unsigned)event->reason:0);}
 }
 static const char form[]=
 "<!doctype html><html lang=en><meta name=viewport content='width=device-width,initial-scale=1'><meta name=referrer content=no-referrer><title>Pixora Setup</title>"
@@ -234,7 +235,7 @@ static void read_quota(void){
         if(status==401||status==403){memset(&last,0,sizeof(last));fetched=false;state="PAIR AGAIN";}
         else if(status==200){
             while(size<16385){int n=esp_http_client_read(c,body+size,16385-size);if(n<0)break;if(!n){valid=esp_http_client_is_complete_data_received(c);break;}size+=n;}
-            quota_view next;if(valid&&quota_parse(body,size,time(NULL),&next)){last=next;fetched=true;last_received=time(NULL);state=!(next.primary.known||next.weekly.known)?"NO QUOTA DATA":next.stale?"STALE / CACHED":"CONNECTED";}
+            quota_view next;if(valid&&quota_parse(body,size,time(NULL),&next)){last=next;fetched=true;last_received=time(NULL);ESP_LOGI("pixora","Authenticated device response accepted (%s)",next.stale?"stale":"fresh");state=!(next.primary.known||next.weekly.known)?"NO QUOTA DATA":next.stale?"STALE / CACHED":"CONNECTED";}
             else{last.stale=true;state="INVALID DATA / CACHED";}
         }else{last.stale=true;state="SERVER ERROR / CACHED";}
     }else{last.stale=true;state="NETWORK ERROR / CACHED";}
