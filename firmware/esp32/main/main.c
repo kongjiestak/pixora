@@ -264,6 +264,7 @@ static esp_err_t set_station(const char *name,const char *secret){
     wifi_config_t config={0};memcpy(config.sta.ssid,name,strlen(name));memcpy(config.sta.password,secret,strlen(secret));
     // Match the selected security class without falling back from a password to open Wi-Fi.
     config.sta.threshold.authmode=secret[0]?WIFI_AUTH_WPA_PSK:WIFI_AUTH_OPEN;
+    config.sta.sae_pwe_h2e=WPA3_SAE_PWE_BOTH;config.sta.pmf_cfg.capable=true;
     esp_wifi_disconnect();xEventGroupClearBits(network,1);vTaskDelay(pdMS_TO_TICKS(150));
     esp_err_t err=esp_wifi_set_config(WIFI_IF_STA,&config);memset(&config,0,sizeof(config));
     return err==ESP_OK?esp_wifi_connect():err;
@@ -314,7 +315,18 @@ void app_main(void){
     ESP_ERROR_CHECK(esp_netif_init());ESP_ERROR_CHECK(esp_event_loop_create_default());network=xEventGroupCreate();esp_netif_create_default_wifi_sta();esp_netif_create_default_wifi_ap();
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();ESP_ERROR_CHECK(esp_wifi_init(&init));ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,wifi_event,NULL));ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,IP_EVENT_STA_GOT_IP,wifi_event,NULL));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));wifi_config_t sta={0};memcpy(sta.sta.ssid,ssid,strlen(ssid));memcpy(sta.sta.password,password,strlen(password));ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta));ESP_ERROR_CHECK(esp_wifi_start());
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));wifi_config_t sta={0};memcpy(sta.sta.ssid,ssid,strlen(ssid));memcpy(sta.sta.password,password,strlen(password));sta.sta.threshold.authmode=password[0]?WIFI_AUTH_WPA_PSK:WIFI_AUTH_OPEN;sta.sta.sae_pwe_h2e=WPA3_SAE_PWE_BOTH;sta.sta.pmf_cfg.capable=true;ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta));ESP_ERROR_CHECK(esp_wifi_start());
+    if(ssid[0]){
+        wifi_scan_config_t scan={0};scan.ssid=(uint8_t*)ssid;scan.show_hidden=true;
+        if(esp_wifi_scan_start(&scan,true)==ESP_OK){
+            uint16_t count=4;wifi_ap_record_t found[4]={0};
+            if(esp_wifi_scan_get_ap_records(&count,found)==ESP_OK){
+                ESP_LOGI("pixora","Configured target scan matches: %u",(unsigned)count);
+                for(int i=0;i<count;i++)ESP_LOGI("pixora","Target radio: auth=%u channel=%u RSSI=%d",(unsigned)found[i].authmode,(unsigned)found[i].primary,found[i].rssi);
+            }
+            esp_wifi_clear_ap_list();
+        }
+    }
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);esp_sntp_setservername(0,"pool.ntp.org");esp_sntp_init();
     if(!config_valid())setup_start();
     else if(!ssid[0]){bsp_display_lock(-1);screen_ui_open_wifi();bsp_display_unlock();}
