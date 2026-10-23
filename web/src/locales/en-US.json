@@ -348,5 +348,21 @@
     "saved": "Device changes saved.",
     "revokedNotice": "Device access revoked.",
     "expiredStatus": "Expired"
+  },
+  "alerts": {
+    "title": "Quota reminders",
+    "scope": "Only in this browser while Pixora is open and connected. No background, watch, ESP32 or push delivery yet. Stored locally per paired device; uses fresh real Codex observations only. Quiet hours use this device’s local time; equal hours disable quiet time.",
+    "enable": "Enable reminders on this browser",
+    "threshold": "Low quota: remaining %",
+    "restore": "Recovered: remaining %",
+    "cooldown": "Per-event cooldown (minutes)",
+    "quiet": "Quiet hours",
+    "start": "Start hour (0–23)",
+    "end": "End hour (0–23)",
+    "empty": "No reminders yet. No synthetic reminder is sent.",
+    "low": "{window}: quota low, {remaining}% remaining",
+    "recovered": "{window}: quota recovered to {remaining}%",
+    "view": "View reminders",
+    "clear": "Clear history"
   }
 }

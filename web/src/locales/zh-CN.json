@@ -348,5 +348,21 @@
     "saved": "设备修改已保存。",
     "revokedNotice": "设备授权已撤销。",
     "expiredStatus": "已过期"
+  },
+  "alerts": {
+    "title": "额度提醒",
+    "scope": "仅在本浏览器打开 Pixora 且已连接时判断；暂不支持后台、手表、ESP32 或推送投递。设置和记录按配对设备保存在本机，只使用新鲜的真实 Codex 观测。静默时段使用设备本地时间，起止相同表示不静默。",
+    "enable": "开启本浏览器提醒",
+    "threshold": "额度不足：剩余百分比",
+    "restore": "额度恢复：剩余百分比",
+    "cooldown": "同类事件冷却（分钟）",
+    "quiet": "静默时段",
+    "start": "开始小时（0–23）",
+    "end": "结束小时（0–23）",
+    "empty": "暂无提醒，不会发送虚构额度提醒。",
+    "low": "{window}额度不足，剩余 {remaining}%",
+    "recovered": "{window}额度恢复至 {remaining}%",
+    "view": "查看提醒",
+    "clear": "清空记录"
   }
 }

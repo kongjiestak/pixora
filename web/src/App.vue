@@ -2,6 +2,7 @@
 import {ref, computed, watch, onMounted, onUnmounted} from 'vue'
 import {useI18n} from 'vue-i18n'
 import Widget from './Widget.vue'
+import QuotaAlerts from './QuotaAlerts.vue'
 import OrbitDisplay from './OrbitDisplay.vue'
 import {displayViewport} from './display-viewport.js'
 import {dashboardWidgets} from './widgets.js'
@@ -220,7 +221,8 @@ onMounted(async()=>{
 onUnmounted(()=>{if(colorMedia?.removeEventListener)colorMedia.removeEventListener('change',colorChanged);else colorMedia?.removeListener?.(colorChanged);viewport?.dispose();clearInterval(timer);clearInterval(tick);cancel();wake?.release();document.removeEventListener('visibilitychange',visibilityChanged)})
 </script>
 <template><div class="pixora-themed" :class="['preset-'+profile.theme,'appearance-'+resolvedAppearance,{'theme-motion':config.motion&&pageVisible}]" :style="themeVars"><OrbitDisplay v-if="!management" :data="config.shared?null:data" :profile="profile" :weather-busy="weatherBusy" :weather-error="weatherError" :clock="clock" :connected="connected" :busy="busy" :mode="mode" :error="error" :motion="config.motion" :visible="pageVisible" :poll-started="pollStarted" :kiosk="kiosk" :wake-state="wakeState" @manage="manage" @display="display" @exit="exit" @motion="config.motion=!config.motion;save()"/>
-<main v-else class="dark settings-page" :class="{motion:config.motion&&pageVisible}" data-ui>
+<QuotaAlerts :active="pageVisible" :data="data" :connected="connected" :allowed="!config.shared&&!deviceProfile?.public_only&&!!deviceProfile" :open="management" @open="manage"/>
+<main v-if="management" class="dark settings-page" :class="{motion:config.motion&&pageVisible}" data-ui>
 <header class="app-bar"><div class="brand-lockup"><span>Pixora</span><small>{{t('settings.title')}}</small></div><button class="secondary" @click="management=false">{{t('orbit.back')}}</button></header>
 <p v-if="error" class="notice notice-error" role="alert">{{t(error.key,error.params||{})}}</p>
 <section class="settings-section" aria-labelledby="display-heading"><h1 id="display-heading">{{t('settings.display')}}</h1><p class="muted">{{t('settings.local')}}</p><div class="settings-fields">
@@ -231,6 +233,7 @@ onUnmounted(()=>{if(colorMedia?.removeEventListener)colorMedia.removeEventListen
 <p v-if="config.shared" class="muted">{{t('settings.privateHidden')}}</p>
 <ul v-else class="source-list"><li v-for="p in data?.providers||[]" :key="p.provider"><strong>{{t('provider.'+p.provider)}}</strong><span>{{t(dataState(p))}}</span><small>{{p.source}} · {{date(p.collected_at||p.observed_at)}}</small></li><li v-for="o in data?.observations||[]" :key="o.connector_id+'/'+o.entity_id"><strong>{{o.provider}} · {{o.entity_id}}</strong><span>{{t(dataState(o))}}</span><small>{{o.source}} · {{date(o.collected_at)}}</small></li></ul>
 <details v-if="!config.shared" class="content-details"><summary>{{t('settings.content')}}</summary><nav class="settings-actions" :aria-label="t('ui.views')"><button v-for="view in ['system','developer','personal']" :key="view" :aria-pressed="activeView===view" @click="activeView=view">{{t('ui.'+view)}}</button></nav><div class="cards"><Widget v-for="id in widgets" :key="id" :kind="id" quota-style="rings" :data="data" :connected="connected" :history="systemHistory" :history-next="historyNext" :history-error="historyError" @history="loadHistory" :clock="clock"/></div></details></section>
+<div id="quota-reminder-settings"></div>
 <section class="settings-section" aria-labelledby="auth-heading"><h2 id="auth-heading">{{t('settings.auth')}}</h2><p v-if="remembered" role="status">{{t('auth.remembered',{time:date(sessionExpiry)})}}</p><p v-else-if="token&&connected">{{t('settings.temporary')}}</p><p v-else>{{t('settings.signedOut')}}</p><p class="muted">{{t('settings.pairHint')}}</p>
 <details v-if="!config.shared" class="manual-pair"><summary>{{t('settings.manual')}}</summary><p class="muted">{{t('settings.tokenPrivate')}}</p><div class="authorization-fields"><label>{{t('config.token')}}<input v-model="token" type="password" autocomplete="off" :placeholder="t('config.tokenHint')" @keyup.enter="connect"></label><label class="check-field"><input type="checkbox" v-model="rememberDevice" :disabled="authBusy||!secureSession">{{t('auth.remember')}}</label><button :disabled="busy||authBusy||!token" @click="connect">{{t('config.connect')}}</button></div></details></section>
 <section v-if="diagnostic" class="settings-section"><h2>{{t('settings.diagnostics')}}</h2><p class="muted">{{t('settings.debugHint')}}</p><label>{{t('config.data')}}<select v-model="mode" @change="changeMode"><option value="real">{{t('config.real')}}</option><option value="demo">{{t('config.demo')}}</option></select></label><button class="secondary" @click="resetDisplay">{{t('settings.resetLegacy')}}</button></section>
