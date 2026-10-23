@@ -106,6 +106,9 @@ def run(config, once=False):
                     navigation = re.search(rb'pixora_ui: navigation (action=\d+ page=\d+|ready page=\d+ face=\d+ build_ms=\d+|paint page=\d+ face=\d+ paint_ms=\d+)', line)
                     if navigation:
                         print('Display navigation: ' + navigation[1].decode(), flush=True)
+                    transition = re.search(rb'pixora_ui: (?:slide|reveal) frames=(\d+) elapsed_ms=(\d+)', line)
+                    if transition:
+                        print('Display transition: frames=%s elapsed_ms=%s' % tuple(x.decode() for x in transition.groups()), flush=True)
                     orientation = re.search(rb'pixora_touch: (orientation requested=\d+ lvgl=\d+ swap=[01] mx=[01] my=[01]|tap raw_x=\d+ raw_y=\d+ mapped_x=\d+ mapped_y=\d+ swap=[01] mx=[01] my=[01])', line)
                     if orientation:
                         print('Display calibration: ' + orientation[1].decode(), flush=True)
