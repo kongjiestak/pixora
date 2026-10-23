@@ -1,6 +1,7 @@
 #include "screen_ui.h"
 #include "display_input.h"
 #include "screen_i18n.h"
+#include "pixel_pet.h"
 #include "theme_tokens.h"
 #include "lvgl.h"
 #include "src/core/lv_obj_event_private.h"
@@ -19,7 +20,7 @@ LV_FONT_DECLARE(pixora_cjk_24);
 typedef struct {lv_obj_t *glyph[32],*group,*image;lv_draw_buf_t *cache;int x,y;char value[129];int angle;bool lower;} arc_text;
 typedef struct {
  lv_obj_t *container,*wake_layer,*home_controls,*rings[2],*center,*caption,*detail,*legends[2],*digits[4];
- lv_obj_t *bot_eyes[2],*bot_arms[2],*bot_caption,*bot_source;
+ lv_obj_t *pet,*bot_caption,*bot_source;lv_draw_buf_t *pet_buffer;uint32_t pet_key;
  arc_text perimeter[4];
 } home_scene;
 static home_scene scenes[3],*scene=&scenes[0];
@@ -36,6 +37,7 @@ static lv_obj_t *display_root,*menu_root;
 static bool chinese,render_pending,warm_done;
 static bool clock_mode,night=true;
 static unsigned face;
+static uint32_t pet_greeting_until;
 static lv_font_t arc_font,arc_cjk_font;
 static unsigned brightness=60,rotation;
 static int timezone_quarters=32; /* Display offset only; parser and system clock remain UTC. */
@@ -249,20 +251,23 @@ static void update_home(void){
  lv_obj_set_style_text_color(center,lv_color_hex(p->ink),0);
 }
 static const char *weather_kind(int code){if(code==0)return "Clear";if(code<=3)return "Cloudy";if(code<=48)return "Fog";if(code<=67)return "Rain";if(code<=77)return "Snow";if(code<=86)return "Showers";return "Storm";}
-static lv_obj_t *bot_box(int x,int y,int w,int h,uint32_t color,int radius){
- lv_obj_t *o=lv_obj_create(root);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,w,h);lv_obj_set_style_bg_color(o,lv_color_hex(color),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);lv_obj_set_style_border_width(o,0,0);lv_obj_set_style_radius(o,radius,0);lv_obj_remove_flag(o,LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);return o;
+static void update_bot(void);
+static void pet_delete(lv_event_t *event){
+ home_scene *owner=lv_event_get_user_data(event);if(owner->pet_buffer){lv_image_cache_drop(owner->pet_buffer);lv_draw_buf_destroy(owner->pet_buffer);owner->pet_buffer=NULL;}
+}
+static void pet_tap(lv_event_t *event){
+ (void)event;if(page||render_pending||transition_active)return;pet_greeting_until=lv_tick_get()+1500;update_bot();
 }
 static void update_bot(void){
- if(face!=2)return;
+ if(face!=2||!scene->pet)return;
  unsigned state=snapshot.activity.expires_at>time(NULL)?snapshot.activity.state:0;
+ bool greeting=(int32_t)(pet_greeting_until-lv_tick_get())>0;
  const char *name=state==1?"Working":state==2?"Resting":state==3?"Task error":"Activity unknown";
- label_value(scene->bot_caption,name);label_value(scene->bot_source,state?"Mac local Codex":"Waiting for task signal");
- unsigned frame=lv_tick_get()/250;bool working=state==1&&motion;
- for(int i=0;i<2;i++){
-  int y=working?263+((frame+i)%2)*12:270;
-  if(lv_obj_get_y(scene->bot_arms[i])!=y)lv_obj_set_y(scene->bot_arms[i],y);
-  bool blink=motion&&(frame%24==0);if(lv_obj_get_height(scene->bot_eyes[i])!=(blink?4:16))lv_obj_set_height(scene->bot_eyes[i],blink?4:16);
- }
+ label_value(scene->bot_caption,name);
+ label_value(scene->bot_source,greeting?"Hello! Tap to wave":state?strstr(connection,"MAC BLE")?"Mac BLE / local Codex":"Mac USB / local Codex":"Waiting for task signal");
+ unsigned frame=lv_tick_get()/250,pose=!motion?0:greeting?frame%2:state==1?frame%4:frame%20==0?4:0;
+ uint32_t key=state*100+pose+(greeting?1000:0);
+ if(scene->pet_buffer&&key!=scene->pet_key){pixel_pet_draw(scene->pet_buffer,state,pose,greeting,palette()->accent);lv_image_set_src(scene->pet,scene->pet_buffer);scene->pet_key=key;}
 }
 static void update_clock(void){
  if(render_pending)return;
@@ -311,7 +316,7 @@ static void render_now(void){
  if(page){
   text(page==4?"Connect Wi-Fi?":page==5?"Connection / Source":"Pixora / Settings",&lv_font_montserrat_24,0,28,p->ink);
   if(page==1){char value[60];snprintf(value,sizeof(value),L("Theme / %s"),L(screen_theme_names[theme]));button(value,0,94,340,3);snprintf(value,sizeof(value),L("Accent / %s"),L(screen_accent_names[accent]));button(value,0,150,340,4);button(motion?"Motion / ON":"Motion / OFF",0,206,340,5);button("Wi-Fi setup...",0,262,340,7);button("Screen / Clock",0,318,340,16);button("Connection / Source",0,374,340,9);}
-  if(page==10){char value[80];snprintf(value,sizeof(value),L("Brightness / %u%%"),brightness);button(value,0,70,340,17);button(night?"Night dim / ON (22-07)":"Night dim / OFF",0,121,340,18);snprintf(value,sizeof(value),L("Rotation / %u > restart"),rotation*90);button(value,0,172,340,40);snprintf(value,sizeof(value),L("Time / UTC%+.2f"),timezone_quarters/4.0);button(value,0,223,340,41);button(face==0?"Open bedside clock":face==1?"Open robot page":"Open quota page",0,274,340,19);button("Language / English",0,325,340,43);}
+  if(page==10){char value[80];snprintf(value,sizeof(value),L("Brightness / %u%%"),brightness);button(value,0,70,340,17);button(night?"Night dim / ON (22-07)":"Night dim / OFF",0,121,340,18);snprintf(value,sizeof(value),L("Rotation / %u > restart"),rotation*90);button(value,0,172,340,40);snprintf(value,sizeof(value),L("Time / UTC%+.2f"),timezone_quarters/4.0);button(value,0,223,340,41);button(face==0?"Open bedside clock":face==1?"Open pet page":"Open quota page",0,274,340,19);button("Language / English",0,325,340,43);}
   if(page==2||page==3)for(unsigned i=0;i<4;i++)button(page==2?screen_theme_names[i]:screen_accent_names[i],0,90+i*58,320,(page==2?20:30)+i);
   if(page==4){text("This pauses the status display.",&lv_font_montserrat_18,0,115,p->muted);text("Existing Wi-Fi is kept until Save.",&lv_font_montserrat_18,0,152,p->muted);button("Open phone setup",0,230,330,8);}
   if(page==5){
@@ -330,13 +335,10 @@ static void render_now(void){
  for(int f=2;f<4;f++){lv_obj_add_flag(perimeter[f].image,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(perimeter[f].image,arc_hit_test,LV_EVENT_HIT_TEST,NULL);lv_obj_add_event_cb(perimeter[f].image,action,LV_EVENT_CLICKED,(void*)9);}
  for(int f=2;f<4;f++)for(int i=0;i<32;i++){lv_obj_add_flag(perimeter[f].glyph[i],LV_OBJ_FLAG_CLICKABLE);lv_obj_set_ext_click_area(perimeter[f].glyph[i],5);lv_obj_add_event_cb(perimeter[f].glyph[i],action,LV_EVENT_CLICKED,(void*)9);}
  if(face==2){
-  text("PIXORA BOT",&lv_font_montserrat_18,0,100,p->muted);
-  bot_box(235,142,10,28,p->accent,5);bot_box(225,132,30,18,p->secondary,9);
-  bot_box(155,170,170,110,p->accent,28);bot_box(170,187,140,73,p->raised,18);
-  scene->bot_eyes[0]=bot_box(194,211,17,16,p->accent,6);scene->bot_eyes[1]=bot_box(270,211,17,16,p->accent,6);
-  bot_box(225,243,30,4,p->muted,2);bot_box(188,288,104,65,p->raised,18);
-  scene->bot_arms[0]=bot_box(153,270,25,59,p->secondary,10);scene->bot_arms[1]=bot_box(302,270,25,59,p->secondary,10);
-  bot_box(199,349,30,14,p->accent,6);bot_box(251,349,30,14,p->accent,6);
+  text("Pixora / Pet",&lv_font_montserrat_18,0,100,p->muted);
+  scene->pet=lv_image_create(root);scene->pet_buffer=lv_draw_buf_create(PIXORA_PET_WIDTH,PIXORA_PET_HEIGHT,LV_COLOR_FORMAT_ARGB8888,LV_STRIDE_AUTO);scene->pet_key=UINT32_MAX;
+  lv_obj_set_pos(scene->pet,144,139);lv_obj_add_flag(scene->pet,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(scene->pet,pet_delete,LV_EVENT_DELETE,scene);lv_obj_add_event_cb(scene->pet,pet_tap,LV_EVENT_CLICKED,NULL);lv_obj_add_event_cb(scene->pet,action,LV_EVENT_LONG_PRESSED,(void*)9);
+  if(!scene->pet_buffer)text("Pet unavailable",&wifi_font,0,240,p->muted);
   scene->bot_caption=text("Activity unknown",&wifi_font,0,374,p->ink);scene->bot_source=text("Waiting for task signal",&lv_font_montserrat_14,0,403,p->muted);
  }else if(clock_mode){
   lv_obj_t *rim=lv_arc_create(root);lv_obj_set_size(rim,360,360);lv_obj_center(rim);lv_arc_set_bg_angles(rim,0,360);lv_arc_set_value(rim,0);lv_obj_remove_style(rim,NULL,LV_PART_KNOB);lv_obj_remove_flag(rim,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_arc_width(rim,2,LV_PART_MAIN);lv_obj_set_style_arc_color(rim,lv_color_hex(p->track),LV_PART_MAIN);lv_obj_set_style_arc_opa(rim,LV_OPA_TRANSP,LV_PART_INDICATOR);

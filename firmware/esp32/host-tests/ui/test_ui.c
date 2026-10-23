@@ -42,7 +42,7 @@ static lv_obj_t *find(lv_obj_t *parent,const char *value){if(lv_obj_has_flag(par
 static void click(const char *value){lv_obj_t *label=find(lv_screen_active(),value);if(!label){fprintf(stderr,"Missing control: %s\n",value);abort();}lv_obj_update_layout(lv_screen_active());lv_area_t a;lv_obj_get_coords(label,&a);point=(lv_point_t){(a.x1+a.x2)/2,(a.y1+a.y2)/2};pressed=true;pump(90);pressed=false;pump(150);}
 static unsigned cached_images(lv_obj_t *obj){
  if(lv_obj_has_flag(obj,LV_OBJ_FLAG_HIDDEN))return 0;
- unsigned n=0;if(lv_obj_check_type(obj,&lv_image_class)){assert(lv_image_get_src(obj));n++;}
+ unsigned n=0;if(lv_obj_check_type(obj,&lv_image_class)){assert(lv_image_get_src(obj));if(lv_obj_get_width(obj)==240)n++;}
  for(unsigned i=0;i<lv_obj_get_child_count(obj);i++)n+=cached_images(lv_obj_get_child(obj,i));return n;
 }
 static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.x=250;pump(40);point.x=140;pump(40);pressed=false;pump(500);}
@@ -78,11 +78,16 @@ int main(void){
  lv_obj_get_coords(lv_obj_get_parent(find(lv_screen_active(),"Back to Orbit")),&back_area);assert(ble_area.y2<back_area.y1);
  image("/tmp/pixora-ui-ble-source.ppm");click("Back to Orbit");
  unsigned before_dark=dark_frames;min_brightness=60;probe_swipe(true);assert(dark_frames==before_dark&&min_brightness==60&&panel_brightness==60);assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-bot.ppm");
+ point=(lv_point_t){240,240};pressed=true;pump(70);pressed=false;pump(150);assert(find(lv_screen_active(),"Hello! Tap to wave"));assert(find(lv_screen_active(),"Working"));image("/tmp/pixora-ui-pet-wave.ppm");pump(1600);assert(find(lv_screen_active(),"Mac USB / local Codex"));
+ fixture.activity.state=3;screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);assert(find(lv_screen_active(),"Task error"));image("/tmp/pixora-ui-pet-error.ppm");
+ fixture.activity.state=2;screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);assert(find(lv_screen_active(),"Resting"));
+ fixture.activity.state=1;screen_ui_update(&fixture,true,"MAC USB / CONNECTED",epoch,true);pump(100);
+ point=(lv_point_t){240,240};pressed=true;pump(650);pressed=false;pump(200);assert(find(lv_screen_active(),"Connection / Source"));click("Back to Orbit");
  probe_swipe(false);assert(find(lv_screen_active(),":"));probe_swipe(true);assert(find(lv_screen_active(),"Working"));
  for(unsigned i=0;i<18;i++){swipe();assert(find(lv_screen_active(),i%3==0?"CODEX":i%3==1?":":"Working"));}
  pump(1100);uint8_t saved_face=0;assert(nvs_get_u8(1,"ui_face",&saved_face)==ESP_OK&&saved_face==2);assert(cached_images(lv_screen_active())==4);
  pump(61000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
  assert(find(lv_screen_active(),"Connection / Source"));image("/tmp/pixora-ui-visible-source-entry.ppm");
  click("Motion / ON");click("Back to Orbit");before_dark=dark_frames;swipe();assert(dark_frames==before_dark&&panel_brightness==60);assert(find(lv_screen_active(),"CODEX"));
- puts("PASS: incremental directional reveals, constant brightness, motion off, cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
+ puts("PASS: pixel pet wave/status/source interaction, incremental directional reveals, constant brightness, motion off, cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
 }

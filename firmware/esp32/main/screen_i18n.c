@@ -119,7 +119,8 @@ static const struct {const char *en,*zh;} messages[]={
  {"INVALID DATA / CACHED","数据无效 / 缓存"},
  {"SERVER ERROR / CACHED","服务器错误 / 缓存"},
  {"NO QUOTA DATA","尚无额度数据"},
- {"Open robot page","切换机器人页面"},
+ {"Open pet page","切换宠物页面"},{"Pixora / Pet","Pixora / 宠物"},
+ {"Hello! Tap to wave","你好！点击挥手"},{"Mac USB / local Codex","USB · Mac 本机 Codex"},{"Mac BLE / local Codex","蓝牙 · Mac 本机 Codex"},{"Pet unavailable","宠物显示不可用"},
  {"Working","正在工作"},{"Resting","休息中"},{"Task error","任务异常"},{"Activity unknown","任务状态未知"},
  {"Mac local Codex","Mac 本机 Codex"},{"Waiting for task signal","等待任务信号"},
 
