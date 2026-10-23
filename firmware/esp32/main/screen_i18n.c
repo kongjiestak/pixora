@@ -1,6 +1,14 @@
 #include "screen_i18n.h"
 #include <string.h>
 static const struct {const char *en,*zh;} messages[]={
+ {"Mac BLE / ON","Mac 蓝牙 / 开"},
+ {"Mac BLE / OFF","Mac 蓝牙 / 关"},
+ {"Transport / Mac BLE bridge","连接 / Mac 蓝牙桥接"},
+ {"BLE ONLINE","蓝牙 在线"},
+ {"MAC BLE / CONNECTED","MAC 蓝牙 / 已连接"},
+ {"MAC BLE / STALE","MAC 蓝牙 / 数据过期"},
+ {"MAC BLE / OFFLINE","MAC 蓝牙 / 离线"},
+ {"MAC BLE / PAIR AGAIN","MAC 蓝牙 / 重新配对"},
  {"Pixora / Settings","Pixora / 设置"},
  {"Connect Wi-Fi?","配置无线网络？"},
  {"Connection / Source","连接与数据来源"},
@@ -111,7 +119,8 @@ static const struct {const char *en,*zh;} messages[]={
  {"INVALID DATA / CACHED","数据无效 / 缓存"},
  {"SERVER ERROR / CACHED","服务器错误 / 缓存"},
  {"NO QUOTA DATA","尚无额度数据"},
- {"Open robot page","切换机器人页面"},
+ {"Open pet page","切换宠物页面"},{"Pixora / Pet","Pixora / 宠物"},
+ {"Hello! Tap to wave","你好！点击挥手"},{"Mac USB / local Codex","USB · Mac 本机 Codex"},{"Mac BLE / local Codex","蓝牙 · Mac 本机 Codex"},{"Pet unavailable","宠物显示不可用"},
  {"Working","正在工作"},{"Resting","休息中"},{"Task error","任务异常"},{"Activity unknown","任务状态未知"},
  {"Mac local Codex","Mac 本机 Codex"},{"Waiting for task signal","等待任务信号"},
 

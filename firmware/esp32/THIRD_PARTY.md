@@ -17,3 +17,5 @@ https://github.com/waveshareteam/Waveshare-ESP32-components
 https://github.com/lvgl/lvgl/tree/v9.3.0
 
 - Pixora UI CJK bitmap subset: Noto Sans CJK SC Regular Sans2.004, original copyright © 2014–2021 Adobe, SIL OFL 1.1. See `fonts/README.md` and `fonts/OFL.txt`; the font is not MIT.
+
+- BLE host: Apache NimBLE bundled with ESP-IDF v5.5.5, Apache-2.0; preserve its LICENSE and NOTICE and applicable transitive tinycrypt license in any firmware bundle. Python Bleak and cryptography are installed dependencies, not vendored source; their own licenses remain applicable.

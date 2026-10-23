@@ -10,4 +10,5 @@
 #define LV_USE_LOG 0
 #define LV_BUILD_EXAMPLES 0
 #define LV_BUILD_DEMOS 0
+#define LV_USE_SNAPSHOT 1
 #endif

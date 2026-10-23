@@ -1,7 +1,10 @@
 #include "screen_ui.h"
+#include "display_input.h"
 #include "screen_i18n.h"
+#include "pixel_pet.h"
 #include "theme_tokens.h"
 #include "lvgl.h"
+#include "src/core/lv_obj_event_private.h"
 LV_FONT_DECLARE(pixora_cjk_18);
 LV_FONT_DECLARE(pixora_cjk_24);
 #include "nvs.h"
@@ -14,10 +17,10 @@ LV_FONT_DECLARE(pixora_cjk_24);
 #include <string.h>
 #include <time.h>
 #include <math.h>
-typedef struct {lv_obj_t *glyph[32];char value[129];int angle;bool lower;} arc_text;
+typedef struct {lv_obj_t *glyph[32],*group,*image;lv_draw_buf_t *cache;int x,y;char value[129];int angle;bool lower;} arc_text;
 typedef struct {
  lv_obj_t *container,*wake_layer,*home_controls,*rings[2],*center,*caption,*detail,*legends[2],*digits[4];
- lv_obj_t *bot_eyes[2],*bot_arms[2],*bot_caption,*bot_source;
+ lv_obj_t *pet,*bot_caption,*bot_source;lv_draw_buf_t *pet_buffer;uint32_t pet_key;
  arc_text perimeter[4];
 } home_scene;
 static home_scene scenes[3],*scene=&scenes[0];
@@ -34,6 +37,7 @@ static lv_obj_t *display_root,*menu_root;
 static bool chinese,render_pending,warm_done;
 static bool clock_mode,night=true;
 static unsigned face;
+static uint32_t pet_greeting_until;
 static lv_font_t arc_font,arc_cjk_font;
 static unsigned brightness=60,rotation;
 static int timezone_quarters=32; /* Display offset only; parser and system clock remain UTC. */
@@ -42,12 +46,15 @@ static uint32_t last_clock_tick;
 static lv_obj_t *root;
 static lv_timer_t *timer;
 static quota_view snapshot;
-static bool usb_source,usb_on;
+static bool usb_source,usb_on,ble_on;
+static void (*ble_callback)(bool);
 static void (*usb_callback)(bool);
 static bool home_dirty=true;
 static bool has_data,paused,motion=true,settings_saved=true;
 static unsigned theme,accent,focus,page;
 static int64_t received;
+static bool face_save_pending;
+static uint32_t face_save_at;
 
 static char connection[64]="CONNECTING";
 static void (*setup_callback)(void);
@@ -65,8 +72,9 @@ static void render(void);
 static void render_now(void);
 static const char *L(const char *value){return screen_translate(chinese,value);}
 static void persist(void){
+ face_save_pending=false;
  nvs_handle_t h;esp_err_t e=nvs_open("pixora",NVS_READWRITE,&h);
- if(e==ESP_OK){e=nvs_set_u8(h,"ui_theme",theme);if(e==ESP_OK)e=nvs_set_u8(h,"ui_accent",accent);if(e==ESP_OK)e=nvs_set_u8(h,"ui_motion",motion);if(e==ESP_OK)e=nvs_set_u8(h,"ui_focus",focus);if(e==ESP_OK)e=nvs_set_u8(h,"usb_bridge",usb_on);if(e==ESP_OK)e=nvs_set_u8(h,"ui_lang",chinese);if(e==ESP_OK)e=nvs_set_u8(h,"ui_clock",clock_mode);if(e==ESP_OK)e=nvs_set_u8(h,"ui_face",face);if(e==ESP_OK)e=nvs_set_u8(h,"ui_night",night);if(e==ESP_OK)e=nvs_set_u8(h,"ui_bright",brightness);if(e==ESP_OK)e=nvs_set_u8(h,"ui_rotation",rotation);if(e==ESP_OK)e=nvs_set_i32(h,"ui_tz",timezone_quarters);if(e==ESP_OK)e=nvs_commit(h);nvs_close(h);}settings_saved=e==ESP_OK;
+ if(e==ESP_OK){e=nvs_set_u8(h,"ui_theme",theme);if(e==ESP_OK)e=nvs_set_u8(h,"ui_accent",accent);if(e==ESP_OK)e=nvs_set_u8(h,"ui_motion",motion);if(e==ESP_OK)e=nvs_set_u8(h,"ui_focus",focus);if(e==ESP_OK)e=nvs_set_u8(h,"usb_bridge",usb_on);if(e==ESP_OK)e=nvs_set_u8(h,"ble_bridge",ble_on);if(e==ESP_OK)e=nvs_set_u8(h,"ui_lang",chinese);if(e==ESP_OK)e=nvs_set_u8(h,"ui_clock",clock_mode);if(e==ESP_OK)e=nvs_set_u8(h,"ui_face",face);if(e==ESP_OK)e=nvs_set_u8(h,"ui_night",night);if(e==ESP_OK)e=nvs_set_u8(h,"ui_bright",brightness);if(e==ESP_OK)e=nvs_set_u8(h,"ui_rotation",rotation);if(e==ESP_OK)e=nvs_set_i32(h,"ui_tz",timezone_quarters);if(e==ESP_OK)e=nvs_commit(h);nvs_close(h);}settings_saved=e==ESP_OK;
 }
 static void label_value(lv_obj_t *label,const char *value){value=L(value);if(strcmp(lv_label_get_text(label),value))lv_label_set_text(label,value);}
 static lv_obj_t *text(const char *value,const lv_font_t *font,int x,int y,uint32_t color){
@@ -84,6 +92,7 @@ static void arc_value(arc_text *field,const char *value){
  char compact[129]={0};for(unsigned i=0;i<length;i++)strcat(compact,glyphs[i]);(void)bytes;
  if(!strcmp(field->value,compact))return;
  snprintf(field->value,sizeof(field->value),"%s",compact);
+ lv_obj_remove_flag(field->group,LV_OBJ_FLAG_HIDDEN);
  const lv_font_t *font=&arc_font;const double radius=214.0;double widths[32]={0},total=0,cursor=0;
  for(unsigned i=0;i<length;i++){widths[i]=lv_font_get_glyph_width(font,codes[i],0)+1.5;total+=widths[i];}
  for(unsigned i=0;i<32;i++){
@@ -91,13 +100,27 @@ static void arc_value(arc_text *field,const char *value){
   double angle=field->angle*M_PI/180+(field->lower?-1:1)*(cursor+widths[i]/2-total/2)/radius;cursor+=widths[i];
   label_value(field->glyph[i],glyphs[i]);lv_obj_remove_flag(field->glyph[i],LV_OBJ_FLAG_HIDDEN);
   lv_obj_set_style_transform_pivot_x(field->glyph[i],lv_pct(50),0);lv_obj_set_style_transform_pivot_y(field->glyph[i],lv_pct(50),0);lv_obj_set_style_transform_rotation(field->glyph[i],(int)(angle*1800/M_PI)+(field->lower?-900:900),0);
-  lv_obj_update_layout(field->glyph[i]);lv_obj_set_align(field->glyph[i],LV_ALIGN_TOP_LEFT);lv_obj_set_pos(field->glyph[i],(int)lround(240+radius*cos(angle))-lv_obj_get_width(field->glyph[i])/2,(int)lround(240+radius*sin(angle))-lv_obj_get_height(field->glyph[i])/2);
+  lv_obj_update_layout(field->glyph[i]);lv_obj_set_align(field->glyph[i],LV_ALIGN_TOP_LEFT);lv_obj_set_pos(field->glyph[i],(int)lround(240+radius*cos(angle))-field->x-lv_obj_get_width(field->glyph[i])/2,(int)lround(240+radius*sin(angle))-field->y-lv_obj_get_height(field->glyph[i])/2);
  }
-
+ /* Rasterize only when text changes, never on an ordinary page switch. */
+ if(!field->cache)field->cache=lv_snapshot_create_draw_buf(field->group,LV_COLOR_FORMAT_ARGB8888);
+ if(field->cache&&lv_snapshot_take_to_draw_buf(field->group,LV_COLOR_FORMAT_ARGB8888,field->cache)==LV_RESULT_OK){
+  lv_image_set_src(field->image,field->cache);lv_obj_remove_flag(field->image,LV_OBJ_FLAG_HIDDEN);lv_obj_add_flag(field->group,LV_OBJ_FLAG_HIDDEN);
+ }else lv_obj_add_flag(field->image,LV_OBJ_FLAG_HIDDEN); /* Keep live glyphs on allocation failure. */
 }
+static void arc_hit_test(lv_event_t *event){
+ lv_hit_test_info_t *info=lv_event_get_param(event);int x=info->point->x-240,y=info->point->y-240;
+ int radius2=x*x+y*y;info->res=info->res&&radius2>=196*196&&radius2<=238*238;
+}
+static void arc_cache_delete(lv_event_t *event){arc_text *field=lv_event_get_user_data(event);if(field->cache){lv_draw_buf_destroy(field->cache);field->cache=NULL;}}
 static void arc_create(arc_text *field,int angle,bool lower,uint32_t color){
  memset(field,0,sizeof(*field));field->angle=angle;field->lower=lower;
+ field->x=(angle==315||angle==45)?240:0;field->y=lower?240:0;
+ field->group=lv_obj_create(root);lv_obj_remove_style_all(field->group);lv_obj_set_size(field->group,240,240);lv_obj_set_pos(field->group,field->x,field->y);lv_obj_remove_flag(field->group,LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);
+ field->image=lv_image_create(root);lv_obj_set_pos(field->image,field->x,field->y);lv_obj_add_flag(field->image,LV_OBJ_FLAG_HIDDEN);lv_obj_add_event_cb(field->image,arc_cache_delete,LV_EVENT_DELETE,field);
+ lv_obj_t *saved_root=root;root=field->group;
  for(int i=0;i<32;i++){field->glyph[i]=text("",&arc_font,0,0,color);lv_obj_set_style_text_font(field->glyph[i],&arc_font,0);lv_obj_add_flag(field->glyph[i],LV_OBJ_FLAG_HIDDEN);}
+ root=saved_root;
 }
 static void update_digits(const struct tm *tm,bool valid){
  if(!clock_mode)return;
@@ -106,24 +129,75 @@ static void update_digits(const struct tm *tm,bool valid){
  snprintf(value,sizeof(value),valid?"%02d":"--",tm->tm_sec);label_value(digits[3],value);
  lv_opa_t opacity=valid&&motion&&(tm->tm_sec%2)?LV_OPA_30:LV_OPA_COVER;if(lv_obj_get_style_text_opa(digits[2],LV_PART_MAIN)!=opacity)lv_obj_set_style_text_opa(digits[2],opacity,0);
 }
+static int64_t navigation_paint_at;
+static bool transition_requested,transition_active;
+static int transition_direction;
+static unsigned transition_frames;
+static int64_t transition_started;
+static lv_obj_t *transition_layer;
+static int transition_progress;
+static lv_draw_buf_t *transition_buffers[2];
+static void update_clock(void);
+static void update_home(void);
+static void transition_cleanup(void){
+ if(transition_layer){lv_obj_delete(transition_layer);transition_layer=NULL;lv_timer_set_period(lv_anim_get_timer(),LV_DEF_REFR_PERIOD);lv_timer_set_period(lv_display_get_refr_timer(NULL),LV_DEF_REFR_PERIOD);}
+ transition_active=false;
+}
+static void transition_finished(lv_anim_t *anim){
+ (void)anim;ESP_LOGI("pixora_ui","reveal frames=%u elapsed_ms=%lld",transition_frames,(long long)((esp_timer_get_time()-transition_started)/1000));transition_cleanup();if(!paused){update_clock();update_home();}
+}
+/* Only invalidate the newly revealed strip. Pixels already revealed stay put. */
+static void transition_position(void *unused,int32_t value){
+ (void)unused;int next=value&~1;if(next<=transition_progress)return;
+ lv_area_t strip={.x1=transition_direction<0?480-next:transition_progress,.y1=0,.x2=transition_direction<0?479-transition_progress:next-1,.y2=479};
+ transition_progress=next;lv_obj_invalidate_area(transition_layer,&strip);
+}
+static void transition_draw(lv_event_t *event){
+ lv_layer_t *layer=lv_event_get_layer(event);lv_area_t saved=layer->_clip_area,clip;
+ lv_area_t bounds={0,0,479,479};
+ lv_area_t areas[2]={{transition_direction<0?0:transition_progress,0,transition_direction<0?479-transition_progress:479,479},
+                   {transition_direction<0?480-transition_progress:0,0,transition_direction<0?479:transition_progress-1,479}};
+ for(unsigned i=0;i<2;i++){
+  clip=saved;if(clip.x1<areas[i].x1)clip.x1=areas[i].x1;if(clip.x2>areas[i].x2)clip.x2=areas[i].x2;if(clip.x1>clip.x2)continue;
+  layer->_clip_area=clip;lv_draw_image_dsc_t image;lv_draw_image_dsc_init(&image);image.src=transition_buffers[i];image.antialias=false;lv_draw_image(layer,&image,&bounds);
+ }
+ layer->_clip_area=saved;
+}
+static bool transition_capture(unsigned index,lv_obj_t *container){
+ if(!transition_buffers[index])transition_buffers[index]=lv_snapshot_create_draw_buf(container,LV_COLOR_FORMAT_RGB565);
+ return transition_buffers[index]&&lv_snapshot_take_to_draw_buf(container,LV_COLOR_FORMAT_RGB565,transition_buffers[index])==LV_RESULT_OK;
+}
+static void transition_start(void){
+ transition_layer=lv_obj_create(display_root);lv_obj_remove_style_all(transition_layer);lv_obj_set_size(transition_layer,480,480);lv_obj_set_pos(transition_layer,0,0);lv_obj_set_style_bg_color(transition_layer,lv_color_hex(palette()->ground),0);lv_obj_set_style_bg_opa(transition_layer,LV_OPA_COVER,0);lv_obj_remove_flag(transition_layer,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(transition_layer,LV_OBJ_FLAG_CLICKABLE);
+ lv_obj_set_user_data(transition_layer,&transition_progress);lv_obj_add_event_cb(transition_layer,transition_draw,LV_EVENT_DRAW_MAIN,NULL);
+ lv_timer_set_period(lv_anim_get_timer(),16);lv_timer_set_period(lv_display_get_refr_timer(NULL),16);
+ transition_active=true;transition_frames=0;transition_started=esp_timer_get_time();transition_progress=0;
+ lv_anim_t anim;lv_anim_init(&anim);lv_anim_set_var(&anim,&transition_layer);lv_anim_set_values(&anim,0,480);lv_anim_set_duration(&anim,280);lv_anim_set_path_cb(&anim,lv_anim_path_ease_in_out);lv_anim_set_exec_cb(&anim,transition_position);lv_anim_set_completed_cb(&anim,transition_finished);lv_anim_start(&anim);
+}
 static void deferred_render(void *unused){
- int64_t started=esp_timer_get_time();(void)unused;lv_indev_t *input=bsp_display_get_input_dev();
+ (void)unused;int64_t started=esp_timer_get_time();
+ bool slide=transition_requested;transition_requested=false;
+ if(slide&&!transition_capture(0,root))slide=false;
+ lv_indev_t *input=pixora_display_get_input_dev();
  if(input){lv_indev_reset(input,NULL);lv_indev_wait_release(input);}
- render_pending=false;render_now();
+ navigation_paint_at=started;render_pending=false;render_now();
  if(page==0&&!warm_done){unsigned saved=face;for(unsigned i=0;i<3;i++)if(i!=saved){face=i;clock_mode=face==1;render_now();}face=saved;clock_mode=face==1;render_now();warm_done=true;}
- ESP_LOGI("pixora_ui","navigation ready page=%u face=%u build_ms=%lld",page,face,(long long)((esp_timer_get_time()-started)/1000));
+ if(slide&&transition_capture(1,root))transition_start();
+ ESP_LOGI("pixora_ui","navigation ready page=%u face=%u build_ms=%lld slide=%u",page,face,(long long)((esp_timer_get_time()-started)/1000),transition_active);
 }
 static void render(void){if(render_pending)return;render_pending=true;if(lv_async_call(deferred_render,NULL)!=LV_RESULT_OK)render_pending=false;}
-static void home_menu(lv_event_t *event){(void)event;if(page)return;if(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN))return;page=1;render();}
+static void home_menu(lv_event_t *event){(void)event;if(render_pending||transition_active||page)return;if(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN))return;page=1;render();}
 static void gesture(lv_event_t *event){
- (void)event;if(page||(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN)))return;lv_indev_t *input=lv_indev_active();if(!input)return;
- lv_dir_t direction=lv_indev_get_gesture_dir(input);if(direction==LV_DIR_LEFT||direction==LV_DIR_RIGHT){face=(face+(direction==LV_DIR_LEFT?1:2))%3;clock_mode=face==1;persist();render();}
+ (void)event;if(render_pending||transition_active||page||(wake_layer&&!lv_obj_has_flag(wake_layer,LV_OBJ_FLAG_HIDDEN)))return;lv_indev_t *input=lv_indev_active();if(!input)return;
+ lv_dir_t direction=lv_indev_get_gesture_dir(input);if(direction==LV_DIR_LEFT||direction==LV_DIR_RIGHT){face=(face+(direction==LV_DIR_LEFT?1:2))%3;clock_mode=face==1;face_save_pending=true;face_save_at=lv_tick_get();transition_requested=motion&&warm_done;transition_direction=direction==LV_DIR_LEFT?-1:1;render();}
 }
 static void wake(lv_event_t *event){(void)event;lv_display_trigger_activity(NULL);if(home_controls)lv_obj_remove_flag(home_controls,LV_OBJ_FLAG_HIDDEN);if(wake_layer)lv_obj_add_flag(wake_layer,LV_OBJ_FLAG_HIDDEN);}
 static void action(lv_event_t *event){
+ if(transition_active)return;
  unsigned id=(unsigned)(uintptr_t)lv_event_get_user_data(event);
  ESP_LOGI("pixora_ui","navigation action=%u page=%u",id,page);
- if(id==43){chinese=!chinese;persist();page=10;}
+ if(id==44){ble_on=!ble_on;persist();if(ble_callback)ble_callback(ble_on);}
+ else if(id==43){chinese=!chinese;persist();page=10;}
  else if(id==16)page=10;
  else if(id==17){brightness=brightness>=100?20:brightness+20;persist();}
  else if(id==18){night=!night;persist();}
@@ -177,20 +251,23 @@ static void update_home(void){
  lv_obj_set_style_text_color(center,lv_color_hex(p->ink),0);
 }
 static const char *weather_kind(int code){if(code==0)return "Clear";if(code<=3)return "Cloudy";if(code<=48)return "Fog";if(code<=67)return "Rain";if(code<=77)return "Snow";if(code<=86)return "Showers";return "Storm";}
-static lv_obj_t *bot_box(int x,int y,int w,int h,uint32_t color,int radius){
- lv_obj_t *o=lv_obj_create(root);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,w,h);lv_obj_set_style_bg_color(o,lv_color_hex(color),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);lv_obj_set_style_border_width(o,0,0);lv_obj_set_style_radius(o,radius,0);lv_obj_remove_flag(o,LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE);return o;
+static void update_bot(void);
+static void pet_delete(lv_event_t *event){
+ home_scene *owner=lv_event_get_user_data(event);if(owner->pet_buffer){lv_image_cache_drop(owner->pet_buffer);lv_draw_buf_destroy(owner->pet_buffer);owner->pet_buffer=NULL;}
+}
+static void pet_tap(lv_event_t *event){
+ (void)event;if(page||render_pending||transition_active)return;pet_greeting_until=lv_tick_get()+1500;update_bot();
 }
 static void update_bot(void){
- if(face!=2)return;
+ if(face!=2||!scene->pet)return;
  unsigned state=snapshot.activity.expires_at>time(NULL)?snapshot.activity.state:0;
+ bool greeting=(int32_t)(pet_greeting_until-lv_tick_get())>0;
  const char *name=state==1?"Working":state==2?"Resting":state==3?"Task error":"Activity unknown";
- label_value(scene->bot_caption,name);label_value(scene->bot_source,state?"Mac local Codex":"Waiting for task signal");
- unsigned frame=lv_tick_get()/250;bool working=state==1&&motion;
- for(int i=0;i<2;i++){
-  int y=working?263+((frame+i)%2)*12:270;
-  if(lv_obj_get_y(scene->bot_arms[i])!=y)lv_obj_set_y(scene->bot_arms[i],y);
-  bool blink=motion&&(frame%24==0);if(lv_obj_get_height(scene->bot_eyes[i])!=(blink?4:16))lv_obj_set_height(scene->bot_eyes[i],blink?4:16);
- }
+ label_value(scene->bot_caption,name);
+ label_value(scene->bot_source,greeting?"Hello! Tap to wave":state?strstr(connection,"MAC BLE")?"Mac BLE / local Codex":"Mac USB / local Codex":"Waiting for task signal");
+ unsigned frame=lv_tick_get()/250,pose=!motion?0:greeting?frame%2:state==1?frame%4:frame%20==0?4:0;
+ uint32_t key=state*100+pose+(greeting?1000:0);
+ if(scene->pet_buffer&&key!=scene->pet_key){pixel_pet_draw(scene->pet_buffer,state,pose,greeting,palette()->accent);lv_image_set_src(scene->pet,scene->pet_buffer);scene->pet_key=key;}
 }
 static void update_clock(void){
  if(render_pending)return;
@@ -202,12 +279,12 @@ static void update_clock(void){
  if(w->known&&now<w->expires_at)snprintf(value,sizeof(value),"%s %.0f C",L(weather_kind(w->code)),w->temperature);
  else {snprintf(value,sizeof(value),"WEATHER --");}
  arc_value(&perimeter[2],value);
- const char *short_state=strstr(connection,"CONNECTED")?usb_source?"USB ONLINE":"WI-FI ONLINE":strstr(connection,"PAIR")?"PAIR AGAIN":strstr(connection,"STALE")?"DATA STALE":"OFFLINE";
+ const char *short_state=strstr(connection,"CONNECTED")?usb_source?strstr(connection,"MAC BLE")?"BLE ONLINE":"USB ONLINE":"WI-FI ONLINE":strstr(connection,"PAIR")?"PAIR AGAIN":strstr(connection,"STALE")?"DATA STALE":"OFFLINE";
  arc_value(&perimeter[3],short_state);update_digits(&tm,valid);update_bot();
 
 }
 static void tick(lv_timer_t *t){
- (void)t;if(paused||render_pending)return;
+ (void)t;if(transition_active)return;if(face_save_pending&&lv_tick_get()-face_save_at>=1000)persist();if(paused||render_pending)return;
  time_t local=time(NULL)+timezone_quarters*900;struct tm tm;gmtime_r(&local,&tm);
  bool idle=lv_display_get_inactive_time(NULL)>15000;
  int target=(night&&time(NULL)>1700000000&&(tm.tm_hour>=22||tm.tm_hour<7)&&idle)?8:(int)brightness;
@@ -238,31 +315,30 @@ static void render_now(void){
  if(page>=6&&page<=9){wifi_page();return;}
  if(page){
   text(page==4?"Connect Wi-Fi?":page==5?"Connection / Source":"Pixora / Settings",&lv_font_montserrat_24,0,28,p->ink);
-  if(page==1){char value[60];snprintf(value,sizeof(value),L("Theme / %s"),L(screen_theme_names[theme]));button(value,0,94,340,3);snprintf(value,sizeof(value),L("Accent / %s"),L(screen_accent_names[accent]));button(value,0,150,340,4);button(motion?"Motion / ON":"Motion / OFF",0,206,340,5);button("Wi-Fi setup...",0,262,340,7);button("Screen / Clock",0,318,340,16);}
-  if(page==10){char value[80];snprintf(value,sizeof(value),L("Brightness / %u%%"),brightness);button(value,0,70,340,17);button(night?"Night dim / ON (22-07)":"Night dim / OFF",0,121,340,18);snprintf(value,sizeof(value),L("Rotation / %u > restart"),rotation*90);button(value,0,172,340,40);snprintf(value,sizeof(value),L("Time / UTC%+.2f"),timezone_quarters/4.0);button(value,0,223,340,41);button(face==0?"Open bedside clock":face==1?"Open robot page":"Open quota page",0,274,340,19);button("Language / English",0,325,340,43);}
+  if(page==1){char value[60];snprintf(value,sizeof(value),L("Theme / %s"),L(screen_theme_names[theme]));button(value,0,94,340,3);snprintf(value,sizeof(value),L("Accent / %s"),L(screen_accent_names[accent]));button(value,0,150,340,4);button(motion?"Motion / ON":"Motion / OFF",0,206,340,5);button("Wi-Fi setup...",0,262,340,7);button("Screen / Clock",0,318,340,16);button("Connection / Source",0,374,340,9);}
+  if(page==10){char value[80];snprintf(value,sizeof(value),L("Brightness / %u%%"),brightness);button(value,0,70,340,17);button(night?"Night dim / ON (22-07)":"Night dim / OFF",0,121,340,18);snprintf(value,sizeof(value),L("Rotation / %u > restart"),rotation*90);button(value,0,172,340,40);snprintf(value,sizeof(value),L("Time / UTC%+.2f"),timezone_quarters/4.0);button(value,0,223,340,41);button(face==0?"Open bedside clock":face==1?"Open pet page":"Open quota page",0,274,340,19);button("Language / English",0,325,340,43);}
   if(page==2||page==3)for(unsigned i=0;i<4;i++)button(page==2?screen_theme_names[i]:screen_accent_names[i],0,90+i*58,320,(page==2?20:30)+i);
   if(page==4){text("This pauses the status display.",&lv_font_montserrat_18,0,115,p->muted);text("Existing Wi-Fi is kept until Save.",&lv_font_montserrat_18,0,152,p->muted);button("Open phone setup",0,230,330,8);}
   if(page==5){
-   text(connection,&lv_font_montserrat_18,0,94,p->ink);text(usb_source?"Transport / Mac USB bridge":"Transport / Wi-Fi + HTTPS",&lv_font_montserrat_18,0,144,p->muted);text("Source / Codex App Server",&lv_font_montserrat_18,0,184,p->muted);
+   text(connection,&lv_font_montserrat_18,0,94,p->ink);text(usb_source?strstr(connection,"MAC BLE")?"Transport / Mac BLE bridge":"Transport / Mac USB bridge":"Transport / Wi-Fi + HTTPS",&lv_font_montserrat_18,0,144,p->muted);text("Source / Codex App Server",&lv_font_montserrat_18,0,184,p->muted);
    char stamp[60];time_t collected=snapshot.collected_at;struct tm utc;
    if(collected&&gmtime_r(&collected,&utc))strftime(stamp,sizeof(stamp),"Collected / %m-%d %H:%M UTC",&utc);else strcpy(stamp,"No collected data");text(stamp,&lv_font_montserrat_18,0,224,p->muted);
    lv_obj_t *city=text(snapshot.weather.known?snapshot.weather.city:snapshot.weather.present?"Weather unavailable":"Weather not authorized",&wifi_font,0,260,p->muted);lv_obj_set_width(city,350);lv_label_set_long_mode(city,LV_LABEL_LONG_DOT);lv_obj_set_style_text_align(city,LV_TEXT_ALIGN_CENTER,0);text("Weather / Open-Meteo.com",&lv_font_montserrat_14,0,284,p->muted);text("CC BY 4.0 / timezone is separate",&lv_font_montserrat_14,0,310,p->muted);
    button(usb_on?"Mac USB / ON":"Mac USB / OFF",0,333,300,15);
+   button(ble_on?"Mac BLE / ON":"Mac BLE / OFF",0,382,300,44);
   }
-  button(page==1||page==5?"Back to Orbit":"Back",0,page==5?397:384,280,page==1||page==5?2:page==4?42:1);return;
+  button(page==1||page==5?"Back to Orbit":"Back",0,page==5||page==1?431:384,280,page==1||page==5?2:page==4?42:1);return;
  }
  wake_layer=NULL;home_controls=NULL;
  /* Outer information band: radius 216; quota rings stay inside radius 180. */
  arc_create(&perimeter[0],225,false,p->ink);arc_create(&perimeter[1],315,false,p->muted);arc_create(&perimeter[2],135,true,p->ink);arc_create(&perimeter[3],45,true,p->muted);
+ for(int f=2;f<4;f++){lv_obj_add_flag(perimeter[f].image,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(perimeter[f].image,arc_hit_test,LV_EVENT_HIT_TEST,NULL);lv_obj_add_event_cb(perimeter[f].image,action,LV_EVENT_CLICKED,(void*)9);}
  for(int f=2;f<4;f++)for(int i=0;i<32;i++){lv_obj_add_flag(perimeter[f].glyph[i],LV_OBJ_FLAG_CLICKABLE);lv_obj_set_ext_click_area(perimeter[f].glyph[i],5);lv_obj_add_event_cb(perimeter[f].glyph[i],action,LV_EVENT_CLICKED,(void*)9);}
  if(face==2){
-  text("PIXORA BOT",&lv_font_montserrat_18,0,100,p->muted);
-  bot_box(235,142,10,28,p->accent,5);bot_box(225,132,30,18,p->secondary,9);
-  bot_box(155,170,170,110,p->accent,28);bot_box(170,187,140,73,p->raised,18);
-  scene->bot_eyes[0]=bot_box(194,211,17,16,p->accent,6);scene->bot_eyes[1]=bot_box(270,211,17,16,p->accent,6);
-  bot_box(225,243,30,4,p->muted,2);bot_box(188,288,104,65,p->raised,18);
-  scene->bot_arms[0]=bot_box(153,270,25,59,p->secondary,10);scene->bot_arms[1]=bot_box(302,270,25,59,p->secondary,10);
-  bot_box(199,349,30,14,p->accent,6);bot_box(251,349,30,14,p->accent,6);
+  text("Pixora / Pet",&lv_font_montserrat_18,0,100,p->muted);
+  scene->pet=lv_image_create(root);scene->pet_buffer=lv_draw_buf_create(PIXORA_PET_WIDTH,PIXORA_PET_HEIGHT,LV_COLOR_FORMAT_ARGB8888,LV_STRIDE_AUTO);scene->pet_key=UINT32_MAX;
+  lv_obj_set_pos(scene->pet,144,139);lv_obj_add_flag(scene->pet,LV_OBJ_FLAG_CLICKABLE);lv_obj_add_event_cb(scene->pet,pet_delete,LV_EVENT_DELETE,scene);lv_obj_add_event_cb(scene->pet,pet_tap,LV_EVENT_CLICKED,NULL);lv_obj_add_event_cb(scene->pet,action,LV_EVENT_LONG_PRESSED,(void*)9);
+  if(!scene->pet_buffer)text("Pet unavailable",&wifi_font,0,240,p->muted);
   scene->bot_caption=text("Activity unknown",&wifi_font,0,374,p->ink);scene->bot_source=text("Waiting for task signal",&lv_font_montserrat_14,0,403,p->muted);
  }else if(clock_mode){
   lv_obj_t *rim=lv_arc_create(root);lv_obj_set_size(rim,360,360);lv_obj_center(rim);lv_arc_set_bg_angles(rim,0,360);lv_arc_set_value(rim,0);lv_obj_remove_style(rim,NULL,LV_PART_KNOB);lv_obj_remove_flag(rim,LV_OBJ_FLAG_CLICKABLE);lv_obj_set_style_arc_width(rim,2,LV_PART_MAIN);lv_obj_set_style_arc_color(rim,lv_color_hex(p->track),LV_PART_MAIN);lv_obj_set_style_arc_opa(rim,LV_OPA_TRANSP,LV_PART_INDICATOR);
@@ -292,23 +368,28 @@ static void refresh_measure(lv_event_t *event){
  if(lv_event_get_code(event)==LV_EVENT_REFR_START){started=esp_timer_get_time();rendered=false;return;}
  if(lv_event_get_code(event)==LV_EVENT_RENDER_START){rendered=true;return;}
  if(lv_event_get_code(event)!=LV_EVENT_REFR_READY||!started||!rendered)return;
+ if(transition_active)transition_frames++;
+ if(navigation_paint_at){
+  ESP_LOGI("pixora_ui","navigation paint page=%u face=%u paint_ms=%lld",page,face,(long long)((esp_timer_get_time()-navigation_paint_at)/1000));navigation_paint_at=0;
+ }
  int64_t elapsed=esp_timer_get_time()-started;started=0;total+=elapsed;if(elapsed>maximum)maximum=elapsed;
  if(++samples==10){ESP_LOGI("pixora_ui","refresh samples=10 mean_ms=%lld max_ms=%lld",(long long)(total/10000),(long long)(maximum/1000));samples=0;total=maximum=0;}
 }
-void screen_ui_create(void (*request_setup)(void),bool (*request_wifi)(const wifi_ui_command *),void (*request_usb)(bool)){
- setup_callback=request_setup;wifi_callback=request_wifi;usb_callback=request_usb;wifi_font=lv_font_montserrat_18;cjk_font=pixora_cjk_18;cjk_font.fallback=&lv_font_simsun_16_cjk;wifi_font.fallback=&cjk_font;root=NULL;display_root=lv_screen_active();paused=false;page=0;
- nvs_handle_t h;if(nvs_open("pixora",NVS_READONLY,&h)==ESP_OK){uint8_t v;if(nvs_get_u8(h,"ui_theme",&v)==ESP_OK&&v<4)theme=v;if(nvs_get_u8(h,"ui_accent",&v)==ESP_OK&&v<4)accent=v;if(nvs_get_u8(h,"ui_motion",&v)==ESP_OK)motion=!!v;if(nvs_get_u8(h,"ui_focus",&v)==ESP_OK&&v<2)focus=v;if(nvs_get_u8(h,"usb_bridge",&v)==ESP_OK)usb_on=!!v;if(nvs_get_u8(h,"ui_lang",&v)==ESP_OK)chinese=!!v;if(nvs_get_u8(h,"ui_clock",&v)==ESP_OK)clock_mode=!!v;if(nvs_get_u8(h,"ui_night",&v)==ESP_OK)night=!!v;if(nvs_get_u8(h,"ui_bright",&v)==ESP_OK&&v>=8&&v<=100)brightness=v;if(nvs_get_u8(h,"ui_rotation",&v)==ESP_OK&&v<4)rotation=v;int32_t zone;if(nvs_get_i32(h,"ui_tz",&zone)==ESP_OK&&zone>=-48&&zone<=56)timezone_quarters=zone;face=clock_mode?1:0;if(nvs_get_u8(h,"ui_face",&v)==ESP_OK&&v<3)face=v;clock_mode=face==1;nvs_close(h);}
+void screen_ui_create(void (*request_setup)(void),bool (*request_wifi)(const wifi_ui_command *),void (*request_usb)(bool),void (*request_ble)(bool)){
+ ble_callback=request_ble;setup_callback=request_setup;wifi_callback=request_wifi;usb_callback=request_usb;wifi_font=lv_font_montserrat_18;cjk_font=pixora_cjk_18;cjk_font.fallback=&lv_font_simsun_16_cjk;wifi_font.fallback=&cjk_font;root=NULL;display_root=lv_screen_active();paused=false;page=0;
+ nvs_handle_t h;if(nvs_open("pixora",NVS_READONLY,&h)==ESP_OK){uint8_t v;if(nvs_get_u8(h,"ui_theme",&v)==ESP_OK&&v<4)theme=v;if(nvs_get_u8(h,"ui_accent",&v)==ESP_OK&&v<4)accent=v;if(nvs_get_u8(h,"ui_motion",&v)==ESP_OK)motion=!!v;if(nvs_get_u8(h,"ui_focus",&v)==ESP_OK&&v<2)focus=v;if(nvs_get_u8(h,"usb_bridge",&v)==ESP_OK)usb_on=!!v;if(nvs_get_u8(h,"ble_bridge",&v)==ESP_OK)ble_on=!!v;if(nvs_get_u8(h,"ui_lang",&v)==ESP_OK)chinese=!!v;if(nvs_get_u8(h,"ui_clock",&v)==ESP_OK)clock_mode=!!v;if(nvs_get_u8(h,"ui_night",&v)==ESP_OK)night=!!v;if(nvs_get_u8(h,"ui_bright",&v)==ESP_OK&&v>=8&&v<=100)brightness=v;if(nvs_get_u8(h,"ui_rotation",&v)==ESP_OK&&v<4)rotation=v;int32_t zone;if(nvs_get_i32(h,"ui_tz",&zone)==ESP_OK&&zone>=-48&&zone<=56)timezone_quarters=zone;face=clock_mode?1:0;if(nvs_get_u8(h,"ui_face",&v)==ESP_OK&&v<3)face=v;clock_mode=face==1;nvs_close(h);}
  arc_font=lv_font_montserrat_24;arc_cjk_font=pixora_cjk_24;arc_cjk_font.fallback=&cjk_font;arc_font.fallback=&arc_cjk_font;
  lv_display_add_event_cb(lv_display_get_default(),refresh_measure,LV_EVENT_REFR_START,NULL);lv_display_add_event_cb(lv_display_get_default(),refresh_measure,LV_EVENT_REFR_READY,NULL);lv_display_add_event_cb(lv_display_get_default(),refresh_measure,LV_EVENT_RENDER_START,NULL);
 
  if(usb_callback){usb_callback(usb_on);}
+ if(ble_callback){ble_callback(ble_on);}
  render();if(!timer)timer=lv_timer_create(tick,250,NULL);
 }
 void screen_ui_update(const quota_view *view,bool fetched,const char *state,int64_t latest,bool from_usb){
  usb_source=from_usb;
- if(latest!=received){received=latest;}snapshot=*view;has_data=fetched;snprintf(connection,sizeof(connection),"%s",state);update_home();if(!page&&!paused&&!render_pending){update_clock();}
+ if(latest!=received){received=latest;}snapshot=*view;has_data=fetched;snprintf(connection,sizeof(connection),"%s",state);if(transition_active)return;update_home();if(!page&&!paused&&!render_pending){update_clock();}
 }
-void screen_ui_pause(void){paused=true;lv_anim_delete_all();}
+void screen_ui_pause(void){paused=true;lv_anim_delete_all();transition_cleanup();transition_requested=false;for(unsigned i=0;i<2;i++)if(transition_buffers[i]){lv_draw_buf_destroy(transition_buffers[i]);transition_buffers[i]=NULL;}}
 
 static void begin_scan(void){
  if(wifi_busy){render();return;}
