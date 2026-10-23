@@ -1,5 +1,8 @@
 # Pixora
 
+> V0.7 local-first increment: local launcher and Web companion. Development build; see [V0.7](docs/V0.7.md).
+
+
 > V0.4 development build: Orbit themes, selectable weather cities, separate administrator device console, pairing/revocation and batch layout publication. See [V0.4](docs/V0.4.md) and the [administrator guide](docs/ADMIN.md). Early Development; no stable Release.
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)

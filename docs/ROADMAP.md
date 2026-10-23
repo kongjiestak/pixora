@@ -38,3 +38,8 @@ See [device profiles, restrictive policies and rollback boundary](V0.4.md). V0.3
 ## V0.4 dev3 update / 更新
 
 Implemented: administrator-only web device inventory, per-device pairing/revocation, restrictive policy editing and atomic batch profile publication. Local overrides keep precedence; arbitrary widget composition, online presence and one-use invitations remain future work. See [administrator guide](ADMIN.md) / [管理员指南](ADMIN.zh-CN.md). Deployment and owner acceptance are separate from automated checks. Package version 0.4.0.dev3 remains Early Development.
+
+
+## 2026-10-23 direction update / 最新方向
+
+V0.6 quota reminders / Watch are paused by owner. V0.7 now prioritizes local computer startup, QR phone access and unified companion displays, followed by USB request-specific controls, then push-to-talk. This supersedes older ordering; implementation and remaining gates: [V0.7](V0.7.md) / [中文](V0.7.zh-CN.md).

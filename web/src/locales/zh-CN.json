@@ -364,5 +364,16 @@
     "recovered": "{window}额度恢复至 {remaining}%",
     "view": "查看提醒",
     "clear": "清空记录"
+  },
+  "pet": {
+    "title": "伙伴",
+    "quota": "额度",
+    "unknown": "状态未知",
+    "working": "正在工作",
+    "idle": "暂时空闲",
+    "error": "任务异常",
+    "hint": "本机活动 · 实验性来源",
+    "wave": "打个招呼",
+    "unavailable": "未连接活动来源"
   }
 }

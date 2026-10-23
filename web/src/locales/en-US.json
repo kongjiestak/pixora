@@ -364,5 +364,16 @@
     "recovered": "{window}: quota recovered to {remaining}%",
     "view": "View reminders",
     "clear": "Clear history"
+  },
+  "pet": {
+    "title": "Companion",
+    "quota": "Quota",
+    "unknown": "Unknown",
+    "working": "Working",
+    "idle": "Idle",
+    "error": "Task error",
+    "hint": "Local activity · Experimental",
+    "wave": "Say hello",
+    "unavailable": "Activity source unavailable"
   }
 }

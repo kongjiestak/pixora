@@ -1,5 +1,8 @@
 # Pixora
 
+> V0.7 本地优先首轮：本地启动器与网页伙伴，仍为开发版；见 [V0.7](docs/V0.7.zh-CN.md)。
+
+
 > V0.4 开发构建：Orbit 多主题、可切换天气城市、独立管理员设备管理、配对与撤销、批量布局发布。见 [V0.4](docs/V0.4.zh-CN.md) 与 [管理指南](docs/ADMIN.zh-CN.md)。仍为 Early Development，未发布稳定版。
 
 [![tests](https://github.com/kongjiestak/pixora/actions/workflows/test.yml/badge.svg)](https://github.com/kongjiestak/pixora/actions/workflows/test.yml)
