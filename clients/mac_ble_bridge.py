@@ -73,9 +73,11 @@ async def run(config,once=False):
                     print('BLE candidate unavailable or not authenticated',flush=True)
             if once:
                 print('No matching enabled BLE screen accepted a frame',flush=True);return 1
-        except (BleakError,OSError,asyncio.TimeoutError):
+        except (BleakError,OSError,asyncio.TimeoutError) as error:
+            # Log an enum/type only: exception text can contain device identifiers.
+            reason=getattr(getattr(error,'reason',None),'name',type(error).__name__)
+            print('BLE unavailable: '+reason,flush=True)
             if once:return 1
-            print('BLE unavailable; retrying',flush=True)
         await asyncio.sleep(5)
 
 def main():
