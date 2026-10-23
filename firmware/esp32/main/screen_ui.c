@@ -132,19 +132,34 @@ static bool transition_requested,transition_active;
 static int transition_direction;
 static unsigned transition_frames;
 static int64_t transition_started;
-static lv_obj_t *transition_layer,*transition_images[2];
+static lv_obj_t *transition_layer;
+static int transition_progress;
 static lv_draw_buf_t *transition_buffers[2];
 static void update_clock(void);
 static void update_home(void);
 static void transition_cleanup(void){
- if(transition_layer){lv_obj_delete(transition_layer);transition_layer=NULL;}
- transition_images[0]=transition_images[1]=NULL;transition_active=false;
+ if(transition_layer){lv_obj_delete(transition_layer);transition_layer=NULL;lv_timer_set_period(lv_anim_get_timer(),LV_DEF_REFR_PERIOD);lv_timer_set_period(lv_display_get_refr_timer(NULL),LV_DEF_REFR_PERIOD);}
+ transition_active=false;
 }
 static void transition_finished(lv_anim_t *anim){
- (void)anim;ESP_LOGI("pixora_ui","slide frames=%u elapsed_ms=%lld",transition_frames,(long long)((esp_timer_get_time()-transition_started)/1000));transition_cleanup();if(!paused){update_clock();update_home();}
+ (void)anim;ESP_LOGI("pixora_ui","reveal frames=%u elapsed_ms=%lld",transition_frames,(long long)((esp_timer_get_time()-transition_started)/1000));transition_cleanup();if(!paused){update_clock();update_home();}
 }
+/* Only invalidate the newly revealed strip. Pixels already revealed stay put. */
 static void transition_position(void *unused,int32_t value){
- (void)unused;lv_obj_set_x(transition_images[0],transition_direction*value);lv_obj_set_x(transition_images[1],transition_direction*(value-480));
+ (void)unused;int next=value&~1;if(next<=transition_progress)return;
+ lv_area_t strip={.x1=transition_direction<0?480-next:transition_progress,.y1=0,.x2=transition_direction<0?479-transition_progress:next-1,.y2=479};
+ transition_progress=next;lv_obj_invalidate_area(transition_layer,&strip);
+}
+static void transition_draw(lv_event_t *event){
+ lv_layer_t *layer=lv_event_get_layer(event);lv_area_t saved=layer->_clip_area,clip;
+ lv_area_t bounds={0,0,479,479};
+ lv_area_t areas[2]={{transition_direction<0?0:transition_progress,0,transition_direction<0?479-transition_progress:479,479},
+                   {transition_direction<0?480-transition_progress:0,0,transition_direction<0?479:transition_progress-1,479}};
+ for(unsigned i=0;i<2;i++){
+  clip=saved;if(clip.x1<areas[i].x1)clip.x1=areas[i].x1;if(clip.x2>areas[i].x2)clip.x2=areas[i].x2;if(clip.x1>clip.x2)continue;
+  layer->_clip_area=clip;lv_draw_image_dsc_t image;lv_draw_image_dsc_init(&image);image.src=transition_buffers[i];image.antialias=false;lv_draw_image(layer,&image,&bounds);
+ }
+ layer->_clip_area=saved;
 }
 static bool transition_capture(unsigned index,lv_obj_t *container){
  if(!transition_buffers[index])transition_buffers[index]=lv_snapshot_create_draw_buf(container,LV_COLOR_FORMAT_RGB565);
@@ -152,8 +167,9 @@ static bool transition_capture(unsigned index,lv_obj_t *container){
 }
 static void transition_start(void){
  transition_layer=lv_obj_create(display_root);lv_obj_remove_style_all(transition_layer);lv_obj_set_size(transition_layer,480,480);lv_obj_set_pos(transition_layer,0,0);lv_obj_set_style_bg_color(transition_layer,lv_color_hex(palette()->ground),0);lv_obj_set_style_bg_opa(transition_layer,LV_OPA_COVER,0);lv_obj_remove_flag(transition_layer,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(transition_layer,LV_OBJ_FLAG_CLICKABLE);
- for(unsigned i=0;i<2;i++){transition_images[i]=lv_image_create(transition_layer);lv_image_set_src(transition_images[i],transition_buffers[i]);lv_obj_set_y(transition_images[i],0);}
- transition_active=true;transition_frames=0;transition_started=esp_timer_get_time();transition_position(NULL,0);
+ lv_obj_set_user_data(transition_layer,&transition_progress);lv_obj_add_event_cb(transition_layer,transition_draw,LV_EVENT_DRAW_MAIN,NULL);
+ lv_timer_set_period(lv_anim_get_timer(),16);lv_timer_set_period(lv_display_get_refr_timer(NULL),16);
+ transition_active=true;transition_frames=0;transition_started=esp_timer_get_time();transition_progress=0;
  lv_anim_t anim;lv_anim_init(&anim);lv_anim_set_var(&anim,&transition_layer);lv_anim_set_values(&anim,0,480);lv_anim_set_duration(&anim,280);lv_anim_set_path_cb(&anim,lv_anim_path_ease_in_out);lv_anim_set_exec_cb(&anim,transition_position);lv_anim_set_completed_cb(&anim,transition_finished);lv_anim_start(&anim);
 }
 static void deferred_render(void *unused){

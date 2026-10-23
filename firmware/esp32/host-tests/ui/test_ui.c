@@ -12,6 +12,7 @@ static time_t epoch=1792679400;
 static unsigned elapsed;
 static lv_indev_t *pointer;
 static uint16_t framebuffer[480*480];
+static unsigned long transfer_pixels;
 static bool pressed;
 static lv_point_t point;
 static struct {char key[24];int32_t value;} storage[24];
@@ -31,7 +32,7 @@ esp_err_t nvs_set_u8(nvs_handle_t h,const char *key,uint8_t value){return nvs_se
 esp_err_t nvs_get_u8(nvs_handle_t h,const char *key,uint8_t *value){int32_t v;int e=nvs_get_i32(h,key,&v);if(!e)*value=v;return e;}
 static void read_pointer(lv_indev_t *input,lv_indev_data_t *data){(void)input;data->point=point;data->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
 static void flush(lv_display_t *display,const lv_area_t *area,uint8_t *pixels){
- const uint16_t *source=(const uint16_t*)pixels;int width=area->x2-area->x1+1;
+ const uint16_t *source=(const uint16_t*)pixels;int width=area->x2-area->x1+1;transfer_pixels+=(unsigned)width*(area->y2-area->y1+1);
  for(int y=area->y1;y<=area->y2;y++)for(int x=area->x1;x<=area->x2;x++)framebuffer[y*480+x]=source[(y-area->y1)*width+x-area->x1];
  lv_display_flush_ready(display);
 }
@@ -45,16 +46,12 @@ static unsigned cached_images(lv_obj_t *obj){
  for(unsigned i=0;i<lv_obj_get_child_count(obj);i++)n+=cached_images(lv_obj_get_child(obj,i));return n;
 }
 static void swipe(void){point=(lv_point_t){340,240};pressed=true;pump(60);point.x=250;pump(40);point.x=140;pump(40);pressed=false;pump(500);}
-static void moving_images(lv_obj_t *obj,lv_obj_t **images,unsigned *count){
- if(lv_obj_has_flag(obj,LV_OBJ_FLAG_HIDDEN))return;
- if(lv_obj_check_type(obj,&lv_image_class)&&lv_obj_get_width(obj)==480){assert(*count<2);images[(*count)++]=obj;}
- for(unsigned i=0;i<lv_obj_get_child_count(obj);i++)moving_images(lv_obj_get_child(obj,i),images,count);
-}
 static void probe_swipe(bool left){
  point=(lv_point_t){left?340:140,240};pressed=true;pump(60);point.x=250;pump(40);point.x=left?140:340;pump(40);pressed=false;pump(80);
- lv_obj_t *images[2]={0};unsigned count=0;moving_images(lv_screen_active(),images,&count);assert(count==2);
- int old_x=lv_obj_get_x(images[0]),new_x=lv_obj_get_x(images[1]);assert(left?(old_x<0&&new_x>0):(old_x>0&&new_x<0));assert(abs(old_x-new_x)==480);
- assert(panel_brightness==60);image("/tmp/pixora-ui-slide-midpoint.ppm");pump(500);count=0;moving_images(lv_screen_active(),images,&count);assert(count==0);
+ lv_obj_t *layer=lv_obj_get_child(lv_screen_active(),-1);int *progress=lv_obj_get_user_data(layer);assert(progress&&*progress>0&&*progress<480);assert(lv_obj_get_width(layer)==480&&lv_obj_get_x(layer)==0);
+ assert(panel_brightness==60);image("/tmp/pixora-ui-reveal-midpoint.ppm");unsigned long before_pixels=transfer_pixels;pump(60);assert(transfer_pixels-before_pixels<480*480);pump(440);
+ /* A complete redraw must match the incremental result: no stripes left behind. */
+ uint16_t before[480*480];memcpy(before,framebuffer,sizeof(before));lv_obj_invalidate(lv_screen_active());lv_refr_now(NULL);assert(!memcmp(before,framebuffer,sizeof(before)));
 }
 static void setup(void){}
 static bool wifi(const wifi_ui_command *c){(void)c;return true;}
@@ -87,5 +84,5 @@ int main(void){
  pump(61000);assert(find(lv_screen_active(),"Activity unknown"));click(LV_SYMBOL_SETTINGS);assert(find(lv_screen_active(),"Pixora / Settings"));
  assert(find(lv_screen_active(),"Connection / Source"));image("/tmp/pixora-ui-visible-source-entry.ppm");
  click("Motion / ON");click("Back to Orbit");before_dark=dark_frames;swipe();assert(dark_frames==before_dark&&panel_brightness==60);assert(find(lv_screen_active(),"CODEX"));
- puts("PASS: directional snapshot slides, constant brightness, motion off, cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
+ puts("PASS: incremental directional reveals, constant brightness, motion off, cached three-face carousel, task-state expiry, real LVGL pointer navigation, four Paper menu cycles, bilingual persistence and per-second digital clock blink");return 0;
 }
