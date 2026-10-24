@@ -364,5 +364,28 @@
     "recovered": "{window}额度恢复至 {remaining}%",
     "view": "查看提醒",
     "clear": "清空记录"
+  },
+  "pet": {
+    "title": "伙伴",
+    "quota": "额度",
+    "unknown": "状态未知",
+    "working": "正在工作",
+    "idle": "暂时空闲",
+    "error": "任务异常",
+    "hint": "本机活动 · 实验性来源",
+    "wave": "打个招呼",
+    "unavailable": "未连接活动来源",
+    "settings": "伙伴与展示",
+    "settingsHint": "点击额度圆环可切到伙伴；以下偏好自动保存在此浏览器。",
+    "name": "伙伴昵称",
+    "startView": "打开时显示",
+    "behavior": "展示状态",
+    "auto": "跟随真实任务",
+    "custom": "自定义展示",
+    "customHint": "自定义只改变动画与文案，不改变 Codex 任务；屏幕同时保留真实状态。",
+    "caption": "个性签名",
+    "real": "真实状态",
+    "daily": "此刻，尽在掌握",
+    "open": "切换到伙伴"
   }
 }

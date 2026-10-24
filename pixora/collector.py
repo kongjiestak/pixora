@@ -33,7 +33,7 @@ async def run(args):
             print(json.dumps([s.model_dump(mode="json") for s in snapshots], ensure_ascii=False))
             return
         try:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False) as client:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False, verify=getattr(args, "ca_file", None) or True) as client:
                 for snapshot in snapshots:
                     endpoint="/api/v2/observations" if snapshot.schema_version==2 else "/api/v1/snapshots"
                     response = await client.post(args.server.rstrip("/")+endpoint, headers={"Authorization": "Bearer "+token}, json=snapshot.model_dump(mode="json"))
@@ -55,6 +55,7 @@ def main():
     p.add_argument("--server", default=setting("SERVER", "http://127.0.0.1:8000"))
     p.add_argument("--interval", type=int, default=120)
     p.add_argument("--max-retry-delay", type=int, default=300, help="failure backoff cap in seconds (30–3600; default 300)")
+    p.add_argument("--ca-file", help="Trusted CA/certificate PEM for a private HTTPS server")
     p.add_argument("--once", action="store_true")
     p.add_argument("--print-only", action="store_true")
     p.add_argument("--allow-private-http", action="store_true")

@@ -1,5 +1,5 @@
 // Cache only public shell files. Never cache API responses or tokens.
-const CACHE='pixora-shell-v17';
+const CACHE='pixora-shell-v19';
 self.addEventListener('install',e=>{e.waitUntil((async()=>{
  const cache=await caches.open(CACHE);
  const shell=await fetch('/',{cache:'reload'});if(!shell.ok)throw Error('shell unavailable');

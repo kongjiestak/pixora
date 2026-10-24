@@ -364,5 +364,28 @@
     "recovered": "{window}: quota recovered to {remaining}%",
     "view": "View reminders",
     "clear": "Clear history"
+  },
+  "pet": {
+    "title": "Companion",
+    "quota": "Quota",
+    "unknown": "Unknown",
+    "working": "Working",
+    "idle": "Idle",
+    "error": "Task error",
+    "hint": "Local activity · Experimental",
+    "wave": "Say hello",
+    "unavailable": "Activity source unavailable",
+    "settings": "Companion & display",
+    "settingsHint": "Tap the quota ring to open your companion. Preferences save in this browser.",
+    "name": "Companion name",
+    "startView": "Opening view",
+    "behavior": "Display state",
+    "auto": "Follow real activity",
+    "custom": "Custom display",
+    "customHint": "Custom display changes animation and text only, never a Codex task. Real status remains visible.",
+    "caption": "Personal message",
+    "real": "Real status",
+    "daily": "YOUR DAILY ORBIT",
+    "open": "Open companion"
   }
 }

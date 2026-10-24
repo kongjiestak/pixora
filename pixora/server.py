@@ -50,7 +50,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="Pixora", version="0.4.0.dev3", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.7.0.dev2", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
@@ -212,6 +212,17 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
             conn.execute("INSERT OR REPLACE INTO snapshots VALUES (?,?,?,?)", (snapshot.provider, snapshot.mode, body, received))
             append(conn, from_snapshot(snapshot), received)
         return {"accepted": True, "received_at": received}
+
+    @app.get("/api/v1/activity")
+    async def local_activity(scope=Depends(read_scope)):
+        # Explicit local-computer feature; never expose the VPS operator's activity.
+        if setting("LOCAL_ACTIVITY", "false").lower() != "true":
+            raise HTTPException(404, "local activity disabled")
+        if 'codex' not in scope['providers'] or 'real' not in scope['modes'] or scope['policy'].public_only:
+            raise HTTPException(403, "activity scope not permitted")
+        import asyncio
+        from pixora.activity import observe_activity
+        return await asyncio.to_thread(observe_activity)
 
     @app.get("/api/v1/device")
     def device(mode: str = "real", scope=Depends(read_scope)):
