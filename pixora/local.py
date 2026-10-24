@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import secrets
 import signal
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -77,12 +78,39 @@ def pairing_page(directory, base, token):
     return page
 
 
+def discover_lan():
+    # UDP connect selects the route without sending packets or requiring a reply.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.connect(('192.0.2.1', 9))
+        candidate = probe.getsockname()[0]
+    address = ipaddress.IPv4Address(candidate)
+    if not address.is_private or address.is_loopback or address.is_link_local or address.is_unspecified:
+        raise ValueError('no private LAN route')
+    return candidate
+
+
+def codex_executable():
+    explicit = os.environ.get('PIXORA_CODEX_BIN') or os.environ.get('APM_CODEX_BIN')
+    if explicit:
+        return explicit
+    found = shutil.which('codex')
+    if found:
+        return found
+    if sys.platform == 'darwin':
+        for app in [Path('/Applications/ChatGPT.app'), Path.home()/'Applications/ChatGPT.app']:
+            candidate = app/'Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+    return 'codex'
+
+
 def main():
     parser = argparse.ArgumentParser(description='Pixora local computer + optional trusted LAN screen')
     parser.add_argument('--data-dir', type=Path, default=Path.home()/'.pixora'/'local')
     parser.add_argument('--web-dir', type=Path, default=Path('web/dist'))
     parser.add_argument('--port', type=int, default=8024)
     parser.add_argument('--lan-address', help='Explicit private IPv4 on this computer; default is localhost only')
+    parser.add_argument('--lan-auto', action='store_true', help='Use this computer’s current private LAN/hotspot address')
     parser.add_argument('--cert', type=Path)
     parser.add_argument('--key', type=Path)
     parser.add_argument('--no-browser', action='store_true')
@@ -91,6 +119,13 @@ def main():
         parser.error('port must be 1–65535')
     if bool(args.cert) != bool(args.key):
         parser.error('--cert and --key must be supplied together')
+    if args.lan_auto and args.lan_address:
+        parser.error('select --lan-auto or --lan-address, not both')
+    if args.lan_auto:
+        try:
+            args.lan_address = discover_lan()
+        except (OSError, ValueError):
+            parser.error('No private network detected. Connect Wi-Fi/hotspot or omit --lan-auto for computer-only use.')
     host = '127.0.0.1'
     if args.lan_address:
         try:
@@ -116,7 +151,7 @@ def main():
     base = f'{scheme}://{host}:{args.port}'
     env = dict(os.environ, PIXORA_DB=str(directory/'pixora.sqlite'), PIXORA_READ_TOKEN=values['read'],
                PIXORA_WRITE_TOKEN=values['write'], PIXORA_ALLOW_LEGACY_READ_TOKEN='false',
-               PIXORA_WEB_DIR=str(args.web_dir.resolve()), PIXORA_LOCAL_ACTIVITY='true')
+               PIXORA_WEB_DIR=str(args.web_dir.resolve()), PIXORA_LOCAL_ACTIVITY='true', PIXORA_CODEX_BIN=codex_executable())
     server = [sys.executable, '-m', 'uvicorn', 'pixora.server:create_app', '--factory', '--host', host,
               '--port', str(args.port), '--no-access-log', '--no-proxy-headers']
     if args.cert:

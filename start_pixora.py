@@ -24,7 +24,7 @@ def main():
         marker.write_text(fingerprint)
     # Reinstall local source so application edits cannot leave a stale installed wheel.
     subprocess.run([str(python),'-m','pip','install','--no-deps',str(root)],cwd=root,check=True)
-    raise SystemExit(subprocess.call([str(python),'-m','pixora.local','--web-dir',str(root/'web/dist'),*sys.argv[1:]],cwd=root))
+    raise SystemExit(subprocess.call([str(python),'-m','pixora.local','--web-dir',str(root/'web/dist'),*(sys.argv[1:] or ['--lan-auto'])],cwd=root))
 
 
 if __name__ == '__main__':

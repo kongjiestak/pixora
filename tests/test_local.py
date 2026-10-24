@@ -53,3 +53,23 @@ def test_activity_default_disabled_and_read_only_scopes(tmp_path, monkeypatch):
 def test_activity_adapter_matches_hardware_contract():
     root=Path(__file__).parents[1]
     assert (root/'pixora/activity.py').read_text() == (root/'clients/codex_activity.py').read_text()
+
+
+def test_gui_codex_fallback_and_network_selection(monkeypatch):
+    from pixora.local import codex_executable, discover_lan
+    monkeypatch.delenv('PIXORA_CODEX_BIN', raising=False)
+    monkeypatch.delenv('APM_CODEX_BIN', raising=False)
+    monkeypatch.setattr('pixora.local.shutil.which',lambda _:None)
+    monkeypatch.setattr('pixora.local.sys.platform','darwin')
+    monkeypatch.setattr('pixora.local.Path.is_file',lambda _:True)
+    monkeypatch.setattr('pixora.local.os.access',lambda *_:True)
+    assert codex_executable().startswith('/Applications/ChatGPT.app/')
+    monkeypatch.setenv('PIXORA_CODEX_BIN','explicit-codex')
+    assert codex_executable() == 'explicit-codex'
+    class Socket:
+        def __enter__(self):return self
+        def __exit__(self,*_):pass
+        def connect(self,*_):pass
+        def getsockname(self):return ('172.20.10.2',12345)
+    monkeypatch.setattr('pixora.local.socket.socket',lambda *_:Socket())
+    assert discover_lan() == '172.20.10.2'
