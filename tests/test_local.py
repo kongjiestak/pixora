@@ -73,3 +73,18 @@ def test_gui_codex_fallback_and_network_selection(monkeypatch):
         def getsockname(self):return ('172.20.10.2',12345)
     monkeypatch.setattr('pixora.local.socket.socket',lambda *_:Socket())
     assert discover_lan() == '172.20.10.2'
+
+
+def test_weather_migration_is_limited_to_launcher_owned_screen(tmp_path):
+    from pixora.device_profiles import read_profile
+    value=prepare(tmp_path)
+    with sqlite3.connect(tmp_path/'pixora.sqlite') as conn:
+        other=provision(conn,'other screen',['codex'],['real'])
+        conn.execute('UPDATE devices SET providers=? WHERE token_hash=?', (json.dumps(['codex']), __import__('pixora.devices',fromlist=['token_hash']).token_hash(value['screen'])))
+    assert prepare(tmp_path)['screen']==value['screen']
+    with sqlite3.connect(tmp_path/'pixora.sqlite') as conn:
+        rows=conn.execute('SELECT id,providers FROM devices').fetchall()
+        assert dict(rows)[other['id']]==json.dumps(['codex'])
+        owned=[row for row in rows if row[0]!=other['id']][0]
+        assert set(json.loads(owned[1]))=={'codex','weather'}
+        assert read_profile(conn,owned[0])[0].weather_location==1796236

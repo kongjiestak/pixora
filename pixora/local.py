@@ -19,6 +19,7 @@ import webbrowser
 from pixora.database import migrate
 from pixora.devices import initialize, provision, token_hash
 from pixora.models import now
+from pixora.device_profiles import configure, read_profile
 
 
 def prepare(directory):
@@ -42,8 +43,15 @@ def prepare(directory):
         row = conn.execute('SELECT id FROM devices WHERE token_hash=? AND revoked=0 AND expires_at>?',
                            (token_hash(value.get('screen', '')), now().isoformat())).fetchone()
         if row is None:
-            device = provision(conn, 'Local screen / 本地屏幕', ['codex'], ['real'], days=30)
+            device = provision(conn, 'Local screen / 本地屏幕', ['codex', 'weather'], ['real'], days=30)
             value['screen'] = device['token']
+            row = (device['id'],)
+        # Migrate only the launcher-owned screen, never other devices or policies.
+        existing = conn.execute('SELECT providers FROM devices WHERE id=?', (row[0],)).fetchone()
+        if set(json.loads(existing[0])) == {'codex'}:
+            conn.execute('UPDATE devices SET providers=? WHERE id=?', (json.dumps(['codex', 'weather']), row[0]))
+        if read_profile(conn, row[0])[2] == 0:
+            configure(conn, row[0], profile={'weather_location': 1796236})
     # Atomic private write, including on platforms without POSIX permission enforcement.
     temporary = directory / ('config-' + secrets.token_hex(8))
     fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)

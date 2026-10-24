@@ -50,7 +50,7 @@ def create_app(db_path=None, read_token=None, write_token=None, stale_seconds=No
     @asynccontextmanager
     async def lifespan(app):
         yield
-    app = FastAPI(title="Pixora", version="0.7.0.dev1", lifespan=lifespan)
+    app = FastAPI(title="Pixora", version="0.7.0.dev2", lifespan=lifespan)
 
     @app.middleware("http")
     async def boundaries(request: Request, call_next):
